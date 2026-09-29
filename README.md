@@ -98,6 +98,15 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
   - **Y が上**（Blender の glTF 書き出しは「+Y 上」が既定で ON）
   - 原点が遠いと AR で見つからない。原点の近くへ寄せる
 
+## AR の置き方（位置合わせ）
+
+- **GPS や座標で現地の位置に合わせる仕組みはありません。**
+  カメラが床を見つけると、**画面の中央に映っている床の上**にモデルを置きます
+- 置いたあとは指で動かして合わせる：**1 本指でドラッグ＝床の上で移動**、**2 本指でひねる＝回転**、
+  `arScale` が `auto` のときだけ **2 本指で広げる・つまむ＝拡大縮小**
+- Android の WebXR で開いたときは、画面の下に操作の案内が出る
+  （Scene Viewer・iPhone の Quick Look は Google・Apple の画面なので出ない）
+
 ## 3. 手元で確かめる
 
 `index.html` をダブルクリックで開くと `models.json` を読めません（ブラウザの制限）。
