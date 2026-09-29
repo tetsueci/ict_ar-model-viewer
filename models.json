@@ -1,0 +1,9 @@
+[
+  {
+    "id": "sample_box",
+    "title": "サンプル：ボックスカルバート",
+    "description": "幅 3.0m × 高さ 2.6m × 延長 6.0m（実寸）",
+    "src": "models/sample_box.glb",
+    "arScale": "fixed"
+  }
+]
