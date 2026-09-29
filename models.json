@@ -5,5 +5,12 @@
     "description": "幅 3.0m × 高さ 2.6m × 延長 6.0m（実寸）",
     "src": "models/sample_box.glb",
     "arScale": "fixed"
+  },
+  {
+    "id": "box10_marker",
+    "title": "位置合わせの試験（目印つき・手で合わせる）",
+    "description": "青い竿＝P1・橙の竿＝P2（5 m 離れた同じ標高）。竿の足もとの輪を現地の点に合わせる。iPhone でも使える",
+    "src": "models/box10_marker.glb",
+    "arScale": "fixed"
   }
 ]

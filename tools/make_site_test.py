@@ -54,7 +54,86 @@ def build_model(A, d, r):
     groups = {(0.58, 0.58, 0.56, 1.0): (zup_to_yup(site), t)}
     out = os.path.join(ROOT, "models", "box10_site.glb")
     n = write_glb(out, groups, name="box10_site")
-    return out, n
+
+    # 手で合わせる版（iPhone の Quick Look 用）：基準点の上に目印を立てたモデル
+    for col, part in markers().items():
+        groups[col] = part
+    out2 = os.path.join(ROOT, "models", "box10_marker.glb")
+    n2 = write_glb(out2, groups, name="box10_marker")
+    return out, n, out2, n2
+
+
+def _merge(parts):
+    vs, ts, base = [], [], 0
+    for v, t in parts:
+        vs.append(np.asarray(v, float))
+        ts.append(np.asarray(t, int) + base)
+        base += len(vs[-1])
+    return np.concatenate(vs), np.concatenate(ts)
+
+
+def _cyl(cx, cy, z0, z1, rad, n=16):
+    a = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    ring = np.column_stack([cx + rad * np.cos(a), cy + rad * np.sin(a)])
+    v = np.vstack([np.column_stack([ring, np.full(n, z0)]), np.column_stack([ring, np.full(n, z1)]),
+                   [[cx, cy, z1]]])
+    t = []
+    for i in range(n):
+        j = (i + 1) % n
+        t += [(i, j, n + j), (i, n + j, n + i), (n + i, n + j, 2 * n)]
+    return v, np.array(t)
+
+
+def _ball(cx, cy, cz, rad, nu=16, nv=10):
+    v, t = [], []
+    for k in range(nv + 1):
+        ph = np.pi * k / nv
+        for i in range(nu):
+            th = 2 * np.pi * i / nu
+            v.append((cx + rad * np.sin(ph) * np.cos(th), cy + rad * np.sin(ph) * np.sin(th), cz + rad * np.cos(ph)))
+    for k in range(nv):
+        for i in range(nu):
+            a, b = k * nu + i, k * nu + (i + 1) % nu
+            t += [(a, a + nu, b + nu), (a, b + nu, b)]
+    return np.array(v), np.array(t)
+
+
+def _ring(cx, cy, z, r0, r1, n=40):
+    a = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    inner = np.column_stack([cx + r0 * np.cos(a), cy + r0 * np.sin(a), np.full(n, z)])
+    outer = np.column_stack([cx + r1 * np.cos(a), cy + r1 * np.sin(a), np.full(n, z)])
+    t = []
+    for i in range(n):
+        j = (i + 1) % n
+        t += [(i, n + i, n + j), (i, n + j, j)]
+    return np.vstack([inner, outer]), np.array(t)
+
+
+def _strip(p, q, z, w):
+    d = np.array(q[:2]) - np.array(p[:2])
+    nrm = np.array([-d[1], d[0]]) / np.linalg.norm(d) * w / 2
+    v = [(p[0] + nrm[0], p[1] + nrm[1], z), (q[0] + nrm[0], q[1] + nrm[1], z),
+         (q[0] - nrm[0], q[1] - nrm[1], z), (p[0] - nrm[0], p[1] - nrm[1], z)]
+    return np.array(v), np.array([(0, 3, 2), (0, 2, 1)])
+
+
+def markers():
+    """P1（青）・P2（橙）に高さ 1.5 m の旗竿と地面の輪、2 点を結ぶ白い帯。
+
+    輪の中心が点。竿は遠くから見つけるため、輪は足もとで合わせるため。
+    """
+    H, z = 1.5, P1[2]
+    out = {}
+    for p, col, rings in ((P1, (0.10, 0.44, 0.84, 1.0), 1), (P2, (0.94, 0.55, 0.0, 1.0), 2)):
+        parts = [_cyl(p[0], p[1], z, z + H, 0.02), _ball(p[0], p[1], z + H, 0.08)]
+        for k in range(rings):                     # P1 は輪 1 本、P2 は 2 本（色を見分けにくいとき用）
+            parts.append(_ring(p[0], p[1], z + 0.004, 0.10 + 0.12 * k, 0.15 + 0.12 * k))
+        parts.append(_ring(p[0], p[1], z + 0.004, 0.0, 0.02))   # 中心の点
+        v, t = _merge(parts)
+        out[col] = (zup_to_yup(v), t)
+    v, t = _strip((P1[0] + 0.3, P1[1]), (P2[0] - 0.3, P2[1]), z + 0.002, 0.04)
+    out[(1.0, 1.0, 1.0, 1.0)] = (zup_to_yup(v), t)
+    return out
 
 
 def write_config():
@@ -165,7 +244,8 @@ def write_plan(A, B, d, r, corners):
 
 def main():
     A, B, d, r, corners = layout()
-    glb, n = build_model(A, d, r)
+    glb, n, glb2, n2 = build_model(A, d, r)
+    print(f"{glb2}  {n2:,} bytes")
     cfg = write_config()
     plan, k = write_plan(A, B, d, r, corners)
     print(f"{glb}  {n:,} bytes")
