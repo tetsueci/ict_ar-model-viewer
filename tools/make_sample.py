@@ -16,7 +16,8 @@ T_WALL, T_TOP, T_BOT = 0.35, 0.35, 0.40
 L = 6.0
 
 
-def box_culvert():
+def box_culvert(L=L):
+    """幅方向 X（中心 0）・延長方向 +Y（0〜L）・Z 上向き（底 0）"""
     ox0, ox1, oz0, oz1 = -W / 2, W / 2, 0.0, H
     ix0, ix1, iz0, iz1 = ox0 + T_WALL, ox1 - T_WALL, T_BOT, H - T_TOP
     outer = [(ox0, oz0), (ox1, oz0), (ox1, oz1), (ox0, oz1)]

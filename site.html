@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>現場 AR 位置合わせ</title>
+<meta name="description" content="現地の 2 点を登録して 3D モデルを現場の位置に表示します（Android の Chrome・ARCore 対応機）">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #5f6878;
+    --line: #dde1e7; --accent: #1a6fd6; --accent-text: #ffffff; --warn: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --panel: #1d2128; --text: #e6e9ee; --muted: #9aa3b2; --line: #2e343d; --accent: #4b93ee; --accent-text: #0b0e12; --warn: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; }
+  .page { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 19px; margin: 4px 0 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 14px 0; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; }
+  ol { margin: 0; padding-left: 1.3em; line-height: 1.7; font-size: 14px; }
+  table { border-collapse: collapse; font-size: 14px; width: 100%; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: right; }
+  th:first-child, td:first-child, th:last-child, td:last-child { text-align: left; }
+  img.plan { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .start { display: block; width: 100%; padding: 14px; border: 0; border-radius: 999px; background: var(--accent);
+    color: var(--accent-text); font: inherit; font-size: 16px; font-weight: 600; }
+  .start:disabled { opacity: .45; }
+  #support { margin-top: 8px; font-size: 13px; color: var(--warn); }
+
+  /* AR 中の画面（dom-overlay） */
+  #overlay { display: none; position: fixed; inset: 0; pointer-events: none; color: #fff;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; }
+  #overlay.on { display: block; }
+  #overlay .top { position: absolute; left: 10px; right: 10px; top: 10px; background: rgba(15,18,22,.78);
+    border-radius: 12px; padding: 10px 12px; font-size: 15px; line-height: 1.5; pointer-events: auto; }
+  #overlay .top b { font-size: 17px; }
+  #overlay .check { margin-top: 6px; font-size: 13px; color: #cfe3ff; white-space: pre-line; }
+  #overlay .check.bad { color: #ffb4a9; }
+  #overlay .live { margin-top: 4px; font-size: 13px; color: #d7f5d0; font-variant-numeric: tabular-nums; }
+  #overlay .bottom { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 8px; padding: 0 10px; pointer-events: auto; }
+  #overlay button { border: 0; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 15px;
+    background: rgba(255,255,255,.92); color: #14171c; }
+  #overlay button.main { background: #1a6fd6; color: #fff; font-weight: 700; padding: 14px 26px; font-size: 17px; }
+  #overlay button:disabled { opacity: .4; }
+  #overlay button.hide { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 id="title">現場 AR 位置合わせ</h1>
+  <div class="muted" id="coords"></div>
+
+  <div class="card">
+    <h2>使い方</h2>
+    <ol>
+      <li>下の「AR を始める」を押し、地面を映しながらスマホをゆっくり動かす（十字が地面に張り付くまで）</li>
+      <li>画面の指示どおり、<b>1 点目の上に十字を合わせて「登録」</b>。できるだけ点に近づいて（1〜2 m）合わせる</li>
+      <li>2 点目も同じように登録すると、モデルが現場の位置に出る</li>
+      <li>画面上の「2 点の距離」の差が大きいときは、点を取り違えている。「やり直す」</li>
+      <li>合わせたあとは、十字の位置の座標が出る。ボックスの角などに十字を当てて、図面の座標と比べられる</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>基準点</h2>
+    <table id="points"><thead><tr><th>点</th><th>X</th><th>Y</th><th>標高</th><th>メモ</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>平面図</h2>
+    <img class="plan" id="plan" alt="基準点とモデルの位置関係の平面図">
+  </div>
+
+  <button class="start" id="start" disabled>AR を始める</button>
+  <div id="support"></div>
+  <p class="muted">Android の Chrome（ARCore 対応機）で動きます。iPhone と PC では AR を始められません。</p>
+</div>
+
+<div id="overlay">
+  <div class="top">
+    <div id="step"><b>地面を探しています…</b><br>スマホをゆっくり左右に動かしてください</div>
+    <div class="check" id="check"></div>
+    <div class="live" id="live"></div>
+  </div>
+  <div class="bottom">
+    <button class="main" id="reg" disabled>登録</button>
+    <button id="redo">やり直す</button>
+    <button id="toggle" class="hide">半透明</button>
+    <button id="exit">終わる</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const $ = id => document.getElementById(id);
+const cfgUrl = new URLSearchParams(location.search).get('cfg') || 'sites/box10_test.json';
+const cfgBase = new URL(cfgUrl, location.href);
+const cfg = await (await fetch(cfgUrl, { cache: 'no-cache' })).json();
+const PTS = cfg.points.slice(0, 2);
+
+// ---------- 準備画面 ----------
+$('title').textContent = cfg.title || '現場 AR 位置合わせ';
+$('coords').textContent = cfg.coords || '';
+document.title = `${cfg.title} | 現場 AR`;
+if (cfg.plan) $('plan').src = new URL(cfg.plan, cfgBase).href; else $('plan').closest('.card').remove();
+const f3 = v => Number(v).toFixed(3);
+$('points').querySelector('tbody').innerHTML = cfg.points.map(p =>
+  `<tr><td>${p.name}</td><td>${f3(p.x)}</td><td>${f3(p.y)}</td><td>${f3(p.z)}</td><td>${p.note || ''}</td></tr>`).join('');
+
+// 現場座標（X=東, Y=北, Z=標高）⇔ glTF（x, y=上, z=南）
+const siteToGl = p => new THREE.Vector3(p.x, p.z, -p.y);
+const glToSite = v => ({ x: v.x, y: -v.z, z: v.y });
+
+// ---------- three.js ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local');
+renderer.domElement.style.display = 'none';
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 200);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777766, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(3, 8, 2); scene.add(sun);
+
+// 十字（地面に張り付く照準）
+const reticle = new THREE.Group();
+{
+  const m = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.09, 0.11, 40).rotateX(-Math.PI / 2), m);
+  const bar1 = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.012).rotateX(-Math.PI / 2), m);
+  const bar2 = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 0.30).rotateX(-Math.PI / 2), m);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.012, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false }));
+  [ring, bar1, bar2, dot].forEach(o => { o.renderOrder = 10; reticle.add(o); });
+}
+reticle.matrixAutoUpdate = false;
+reticle.visible = false;
+scene.add(reticle);
+
+// 登録した点の印（現地側）
+function pin(color) {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .4 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6, 12), m); pole.position.y = 0.3;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), m); head.position.y = 0.6;
+  const base = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.07, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color }));
+  g.add(pole, head, base);
+  return g;
+}
+const PIN_COLORS = [0x1a6fd6, 0xf08c00];
+const pins = PIN_COLORS.map(c => { const p = pin(c); p.visible = false; scene.add(p); return p; });
+
+// モデル（現場座標のまま）＋ 図面側の基準点の印
+const siteGroup = new THREE.Group();
+siteGroup.visible = false;
+scene.add(siteGroup);
+let modelRoot = null;
+new GLTFLoader().load(new URL(cfg.model, cfgBase).href, g => { modelRoot = g.scene; siteGroup.add(modelRoot); },
+  undefined, () => { $('support').textContent = 'モデルを読めませんでした（' + cfg.model + '）'; });
+PTS.forEach((p, i) => {
+  const r = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 40).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: PIN_COLORS[i], side: THREE.DoubleSide, depthTest: false }));
+  r.renderOrder = 5; r.position.copy(siteToGl(p)); r.position.y += 0.005; siteGroup.add(r);
+});
+
+// ---------- AR の状態 ----------
+let session = null, hitSource = null, refSpace = null;
+let lastHit = null;            // 十字の位置（Vector3）
+let step = 0;                  // 0,1 = 何点目を登録するか / 2 = 合わせ終わり
+const measured = [];           // 登録した現地の点
+let placeMatrix = null;        // 合わせた結果（local → 現場の glTF 座標の逆）
+let anchor = null, anchorWant = null, anchorOffset = null;
+let translucent = false;
+
+function showStep() {
+  const s = $('step');
+  if (step < 2) {
+    const p = PTS[step];
+    s.innerHTML = lastHit
+      ? `<b>${step + 1} 点目：${p.name} に十字を合わせて「登録」</b><br>点に近づいて、赤い点を ${p.name} の真上に`
+      : '<b>地面を探しています…</b><br>スマホをゆっくり左右に動かしてください';
+    $('reg').disabled = !lastHit;
+    $('reg').classList.remove('hide');
+    $('toggle').classList.add('hide');
+  } else {
+    s.innerHTML = '<b>合わせました</b><br>十字をボックスの角などに当てると、その場所の座標が出ます';
+    $('reg').classList.add('hide');
+    $('toggle').classList.remove('hide');
+  }
+}
+
+function register() {
+  if (!lastHit || step >= 2) return;
+  measured[step] = lastHit.clone();
+  pins[step].position.copy(lastHit);
+  pins[step].visible = true;
+  step++;
+  if (step === 2) solve();
+  showStep();
+}
+
+// 2 点から、モデルの向き（鉛直軸まわり）と位置を決める
+function solve() {
+  const d = siteToGl(PTS[1]).sub(siteToGl(PTS[0]));      // 図面側
+  const q = measured[1].clone().sub(measured[0]);          // 現地側
+  const theta = Math.atan2(d.z, d.x) - Math.atan2(q.z, q.x);
+  const rot = new THREE.Matrix4().makeRotationY(theta);
+  const pm = siteToGl(PTS[0]).add(siteToGl(PTS[1])).multiplyScalar(0.5);
+  const qm = measured[0].clone().add(measured[1]).multiplyScalar(0.5);
+  const t = qm.clone().sub(pm.clone().applyMatrix4(rot));
+  placeMatrix = new THREE.Matrix4().makeTranslation(t.x, t.y, t.z).multiply(rot);
+  siteGroup.matrixAutoUpdate = false;
+  siteGroup.matrix.copy(placeMatrix);
+  siteGroup.matrixWorldNeedsUpdate = true;
+  siteGroup.visible = true;
+  anchorWant = qm;             // 次のフレームでアンカーを作る（歩いたときのずれを減らす）
+
+  const dh = Math.hypot(d.x, d.z), qh = Math.hypot(q.x, q.z);
+  const diff = (qh - dh) * 100;
+  const dz = (q.y - d.y) * 100;
+  const bad = Math.abs(diff) > 20 || Math.abs(dz) > 20;
+  $('check').className = 'check' + (bad ? ' bad' : '');
+  $('check').textContent =
+    `2 点の距離　現地 ${qh.toFixed(2)} m ／ 図面 ${dh.toFixed(2)} m（差 ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} cm）\n` +
+    `2 点の高さの差　現地 ${(q.y * 100).toFixed(0)} cm ／ 図面 ${(d.y * 100).toFixed(0)} cm` +
+    (bad ? '\n★差が大きい。点を取り違えていないか確かめて「やり直す」' : '');
+}
+
+function reset() {
+  step = 0; measured.length = 0; placeMatrix = null;
+  if (anchor) { try { anchor.delete(); } catch (e) {} }
+  anchor = null; anchorWant = null; anchorOffset = null;
+  pins.forEach(p => p.visible = false);
+  siteGroup.visible = false;
+  $('check').textContent = ''; $('live').textContent = '';
+  showStep();
+}
+
+function setTranslucent(on) {
+  translucent = on;
+  $('toggle').textContent = on ? '不透明' : '半透明';
+  modelRoot?.traverse(o => {
+    if (!o.isMesh) return;
+    o.material.transparent = on; o.material.opacity = on ? 0.45 : 1; o.material.depthWrite = !on;
+    o.material.needsUpdate = true;
+  });
+}
+
+// ---------- 開始・終了 ----------
+async function startAR() {
+  const overlay = $('overlay');
+  session = await navigator.xr.requestSession('immersive-ar', {
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['dom-overlay', 'anchors'],
+    domOverlay: { root: overlay },
+  });
+  overlay.classList.add('on');
+  overlay.addEventListener('beforexrselect', e => e.preventDefault());
+  renderer.domElement.style.display = 'block';
+  await renderer.xr.setSession(session);
+  refSpace = renderer.xr.getReferenceSpace();
+  const viewer = await session.requestReferenceSpace('viewer');
+  hitSource = await session.requestHitTestSource({ space: viewer });
+  session.addEventListener('end', () => {
+    hitSource = null; session = null; lastHit = null; reticle.visible = false;
+    overlay.classList.remove('on'); renderer.domElement.style.display = 'none';
+    reset();
+  });
+  reset();
+}
+
+$('reg').onclick = register;
+$('redo').onclick = reset;
+$('toggle').onclick = () => setTranslucent(!translucent);
+$('exit').onclick = () => session?.end();
+$('start').onclick = () => startAR().catch(e => { $('support').textContent = 'AR を始められませんでした：' + e.message; });
+
+if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) {
+  $('start').disabled = false;
+} else {
+  $('support').textContent = 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機で開いてください）';
+}
+
+// ---------- 毎フレーム ----------
+const tmpM = new THREE.Matrix4();
+renderer.setAnimationLoop((time, frame) => {
+  if (frame && hitSource) {
+    const hits = frame.getHitTestResults(hitSource);
+    if (hits.length) {
+      const pose = hits[0].getPose(refSpace);
+      reticle.matrix.fromArray(pose.transform.matrix);
+      reticle.matrixWorldNeedsUpdate = true;
+      reticle.visible = true;
+      const first = !lastHit;
+      lastHit = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+      if (first) showStep();
+    } else {
+      reticle.visible = false;
+      if (lastHit) { lastHit = null; showStep(); }
+    }
+
+    // アンカー：合わせた直後に作り、以後はアンカーの動きに合わせてモデルを動かす
+    if (anchorWant && frame.createAnchor) {
+      const at = anchorWant; anchorWant = null;
+      frame.createAnchor(new XRRigidTransform({ x: at.x, y: at.y, z: at.z }), refSpace).then(a => {
+        anchor = a;
+        const a0 = new THREE.Matrix4().makeTranslation(at.x, at.y, at.z);
+        anchorOffset = a0.invert().multiply(placeMatrix.clone());
+      }).catch(() => {});
+    }
+    if (anchor && anchorOffset && frame.trackedAnchors?.has(anchor)) {
+      const ap = frame.getPose(anchor.anchorSpace, refSpace);
+      if (ap) { siteGroup.matrix.multiplyMatrices(tmpM.fromArray(ap.transform.matrix), anchorOffset); siteGroup.matrixWorldNeedsUpdate = true; }
+    }
+
+    // 合わせたあと：十字の位置を現場座標で出す
+    if (step === 2 && lastHit) {
+      const inv = tmpM.copy(siteGroup.matrix).invert();
+      const s = glToSite(lastHit.clone().applyMatrix4(inv));
+      $('live').textContent = `十字の位置　X ${s.x.toFixed(2)}　Y ${s.y.toFixed(2)}　標高 ${s.z.toFixed(2)}`;
+    }
+  }
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

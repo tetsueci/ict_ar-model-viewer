@@ -107,6 +107,27 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 - Android の WebXR で開いたときは、画面の下に操作の案内が出る
   （Scene Viewer・iPhone の Quick Look は Google・Apple の画面なので出ない）
 
+## 現場の位置に合わせる（site.html）
+
+現地の 2 点を登録して、モデルを現場の座標どおりに出すページ。
+Android の Chrome（ARCore 対応機）専用。
+
+- 開き方：`https://<アカウント>.github.io/ict_ar-model-viewer/site.html`
+  （設定を変えるときは `site.html?cfg=sites/<設定>.json`）
+- 流れ：地面を映す → 1 点目に十字を合わせて「登録」→ 2 点目も「登録」→ モデルが出る
+- 画面に「2 点の距離（現地／図面）」が出る。差が大きければ点の取り違え
+- 合わせたあとは、十字の位置の現場座標が出る（ボックスの角などで確かめる）
+
+設定（`sites/*.json`）にはモデルと基準点を書く。モデルは**原点へ寄せず、基準点と同じ座標で**作る。
+
+| 項目 | 意味 |
+|---|---|
+| `model` | GLB（設定ファイルからの相対パス） |
+| `points` | 基準点。先頭の 2 点を使う。`x`=東 `y`=北 `z`=標高（m） |
+| `plan` | （任意）平面図の画像 |
+
+試験用の一式（2 点が 5 m・ボックス延長 10 m）は `python tools/make_site_test.py` で作り直せる。
+
 ## 3. 手元で確かめる
 
 `index.html` をダブルクリックで開くと `models.json` を読めません（ブラウザの制限）。

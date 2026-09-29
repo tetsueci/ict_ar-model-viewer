@@ -1,0 +1,22 @@
+{
+  "title": "位置合わせの試験（ボックス 10 m）",
+  "model": "../models/box10_site.glb",
+  "plan": "box10_test_plan.svg",
+  "coords": "現場座標（X=東・Y=北・Z=標高、m）。原点は P1",
+  "points": [
+    {
+      "name": "P1",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0,
+      "note": "1 点目"
+    },
+    {
+      "name": "P2",
+      "x": 5.0,
+      "y": 0.0,
+      "z": 0.0,
+      "note": "2 点目（P1 から 5 m）"
+    }
+  ]
+}
