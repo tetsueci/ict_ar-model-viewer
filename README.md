@@ -107,7 +107,19 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 - Android の WebXR で開いたときは、画面の下に操作の案内が出る
   （Scene Viewer・iPhone の Quick Look は Google・Apple の画面なので出ない）
 
-## 現場の位置に合わせる（site.html）
+## 現場の位置に合わせる（align/）★今後はこちらを更新する
+
+`https://<アカウント>.github.io/ict_ar-model-viewer/align/`（Android の Chrome・ARCore 対応機）
+
+- フォルダの中だけで完結する：`index.html`（ページ）・`config.json`（基準点とモデル）・`model.glb`・`plan.svg`
+- **位置合わせモード**（橙）のときだけモデルが動く。「固定する」で固定中（緑）になり、触っても動かない
+- 固定する点（P1 / P2）を選び、その点を中心に回転・拡大する
+  - 「◎ P1 をここへ」：固定点を十字の位置へ
+  - 「→ P2 へ向ける」：固定点を中心に回して、もう一方の点を十字の方向へ（拡大ありなら距離も合わせる）
+  - 画面をなぞる・ひねる＝回転、2 本指で広げる＝拡大（拡大ありのとき）、⟲⟳ ▲▼ ボタンで微調整
+- 中身は `python tools/make_site_test.py` で作り直せる（試験用の一式）
+
+## 現場の位置に合わせる・旧版（site.html）
 
 現地の 2 点を登録して、モデルを現場の座標どおりに出すページ。
 Android の Chrome（ARCore 対応機）専用。

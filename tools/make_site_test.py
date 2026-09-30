@@ -155,6 +155,28 @@ def write_config():
     return path
 
 
+def write_align(glb, plan):
+    """align/（位置合わせモードのページ）の中身。フォルダの中だけで完結させる"""
+    import shutil
+    dst = os.path.join(ROOT, "align")
+    os.makedirs(dst, exist_ok=True)
+    shutil.copyfile(glb, os.path.join(dst, "model.glb"))
+    shutil.copyfile(plan, os.path.join(dst, "plan.svg"))
+    cfg = {
+        "title": "位置合わせの試験（ボックス 10 m）",
+        "model": "model.glb",
+        "plan": "plan.svg",
+        "coords": "現場座標（X=東・Y=北・Z=標高、m）。原点は P1",
+        "points": [
+            {"name": "P1", "x": P1[0], "y": P1[1], "z": P1[2], "note": "青い竿・輪 1 本"},
+            {"name": "P2", "x": P2[0], "y": P2[1], "z": P2[2], "note": "橙の竿・輪 2 本（P1 から 5 m）"},
+        ],
+    }
+    with open(os.path.join(dst, "config.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 def write_plan(A, B, d, r, corners):
     S = 42.0                                   # 1 m の画素数
     x0, x1, y0, y1 = -4.0, 10.0, -5.5, 13.0    # 描く範囲（m）
@@ -248,6 +270,7 @@ def main():
     print(f"{glb2}  {n2:,} bytes")
     cfg = write_config()
     plan, k = write_plan(A, B, d, r, corners)
+    write_align(glb2, plan)
     print(f"{glb}  {n:,} bytes")
     print(cfg)
     print(plan)
