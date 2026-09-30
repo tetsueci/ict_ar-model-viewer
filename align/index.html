@@ -5,7 +5,8 @@
 <script>
   // iPhone で WebXR を使うための Variant Launch（https://launch.variant3d.com/）。
   // キーを入れると有効になる。空なら Android（ARCore 対応機）だけで動く。
-  const VL_KEY = '';
+  // redirect は付けない：iPhone でもまず説明と平面図を見せ、「AR を始める」で Launch へ移る
+  const VL_KEY = 'WKLOEbI0zNM5TK7uuvXyySVCYLN7zf3k';
   window.__vl = null;
   window.addEventListener('vlaunch-initialized', e => { window.__vl = e.detail; });
   if (VL_KEY) document.write('<script src="https://launchar.app/sdk/v1?key=' + VL_KEY + '"><\/script>');
