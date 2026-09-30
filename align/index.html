@@ -9,7 +9,10 @@
   const VL_KEY = 'WKLOEbI0zNM5TK7uuvXyySVCYLN7zf3k';
   window.__vl = null;
   window.addEventListener('vlaunch-initialized', e => { window.__vl = e.detail; });
-  if (VL_KEY) document.write('<script src="https://launchar.app/sdk/v1?key=' + VL_KEY + '"><\/script>');
+  // SDK を読むと Android・PC でも launch として数えられる（2026-09-30 に確認）。
+  // Android は Chrome の WebXR で足りるので、iPhone・iPad のときだけ読む
+  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (VL_KEY && IS_IOS) document.write('<script src="https://launchar.app/sdk/v1?key=' + VL_KEY + '"><\/script>');
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>現場 AR 位置合わせ</title>
@@ -423,8 +426,7 @@ function launchReady(d) {
 if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) {
   $('start').disabled = false;
 } else if (!launchReady(window.__vl)) {
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  $('support').innerHTML = ios && VL_KEY
+  $('support').innerHTML = IS_IOS && VL_KEY
     ? '準備中です。少し待ってから再読み込みしてください。'
     : 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機で開いてください）。'
       + '<br>iPhone は <a href="../?m=box10_marker">目印つきモデル（指で合わせる版）</a> を使ってください。';
