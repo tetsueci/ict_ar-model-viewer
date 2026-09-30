@@ -292,7 +292,7 @@ def main():
     print(f"{glb2}  {n2:,} bytes")
     cfg = write_config()
     plan, k = write_plan(A, B, d, r, corners)
-    write_align(glb2, plan)
+    # align/ は実案件（dxf_to_site.py）で使うので、ここでは書かない
     print(f"{glb}  {n:,} bytes")
     print(cfg)
     print(plan)

@@ -117,7 +117,16 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
   - 「◎ P1 をここへ」：固定点を十字の位置へ
   - 「→ P2 へ向ける」：固定点を中心に回して、もう一方の点を十字の方向へ（拡大ありなら距離も合わせる）
   - 画面をなぞる・ひねる＝回転、2 本指で広げる＝拡大（拡大ありのとき）、⟲⟳ ▲▼ ボタンで微調整
-- 中身は `python tools/make_site_test.py` で作り直せる（試験用の一式）
+- 中身（model.glb・config.json・plan.png）は道路モデルの DXF から作る
+
+  ```bash
+  python tools/dxf_to_site.py <model.dxf> --title "名前"
+  ```
+
+  - 読む図形：ポリゴンメッシュ・ポリフェースメッシュ・3DFACE。3DSOLID は DXF から形が読めないので、
+    同じフォルダの `road_box.lsp`（ボックスカルバートの寸法）から作り直す
+  - **基準点＝Z 方向に立てた LINE の下の端**（2 本。見つけた順に P1・P2）
+- 試験用の一式（2 点 5 m・ボックス 10 m）は `python tools/make_site_test.py`（`sites/` に出る）
 
 ## 現場の位置に合わせる・旧版（site.html）
 
