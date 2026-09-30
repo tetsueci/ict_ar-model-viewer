@@ -2,6 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<script>
+  // iPhone で WebXR を使うための Variant Launch（https://launch.variant3d.com/）。
+  // キーを入れると有効になる。空なら Android（ARCore 対応機）だけで動く。
+  const VL_KEY = '';
+  window.__vl = null;
+  window.addEventListener('vlaunch-initialized', e => { window.__vl = e.detail; });
+  if (VL_KEY) document.write('<script src="https://launchar.app/sdk/v1?key=' + VL_KEY + '"><\/script>');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>現場 AR 位置合わせ</title>
 <meta name="description" content="位置合わせモードで、基準点を固定して回転・拡大しながらモデルを現場に合わせます（Android の Chrome・ARCore 対応機）">
@@ -381,7 +389,7 @@ async function startAR() {
   const overlay = $('overlay');
   session = await navigator.xr.requestSession('immersive-ar', {
     requiredFeatures: ['hit-test'],
-    optionalFeatures: ['dom-overlay', 'anchors'],
+    optionalFeatures: ['local', 'dom-overlay', 'anchors'],
     domOverlay: { root: overlay },
   });
   overlay.classList.add('on');
@@ -403,11 +411,23 @@ async function startAR() {
 }
 $('start').onclick = () => startAR().catch(e => { $('support').textContent = 'AR を始められませんでした：' + e.message; });
 
+// iPhone：Variant Launch の中で開き直すと WebXR が使える
+function launchReady(d) {
+  if (!d || !d.launchRequired) return false;
+  $('start').textContent = 'AR を始める（iPhone：「開く」を押してください）';
+  $('start').disabled = false;
+  $('start').onclick = () => { location.href = d.launchUrl; };
+  return true;
+}
 if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) {
   $('start').disabled = false;
-} else {
-  $('support').innerHTML = 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機で開いてください）。'
-    + '<br>iPhone は <a href="../?m=box10_marker">目印つきモデル（指で合わせる版）</a> を使ってください。';
+} else if (!launchReady(window.__vl)) {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  $('support').innerHTML = ios && VL_KEY
+    ? '準備中です。少し待ってから再読み込みしてください。'
+    : 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機で開いてください）。'
+      + '<br>iPhone は <a href="../?m=box10_marker">目印つきモデル（指で合わせる版）</a> を使ってください。';
+  window.addEventListener('vlaunch-initialized', e => { if (launchReady(e.detail)) $('support').textContent = ''; });
 }
 
 // ---------- 毎フレーム ----------
