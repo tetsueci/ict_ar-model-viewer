@@ -244,7 +244,7 @@ def write_plan(faces, points, path, title):
             leg.add_patch(plt.Rectangle((0.02, yy - 0.05), 0.08, 0.07, color=LAYER_COLOR[lay], transform=leg.transAxes))
             leg.text(0.13, yy - 0.015, nm, transform=leg.transAxes, va="center", fontsize=11)
             yy -= 0.11
-    leg.text(0.02, yy - 0.04, "〇 基準点（鉛直の線の下の端）", transform=leg.transAxes, fontsize=11, va="center")
+    leg.text(0.02, yy - 0.04, "〇 基準点", transform=leg.transAxes, fontsize=11, va="center")
     leg.text(0.02, yy - 0.15, "\n".join(f"{p['name']}  X {p['x']:.3f}  Y {p['y']:.3f}  Z {p['z']:.3f}" for p in points),
              transform=leg.transAxes, fontsize=10.5, va="top", family="monospace")
     fig.tight_layout()
@@ -258,6 +258,8 @@ def main():
     ap.add_argument("--box", help="road_box.lsp（無ければ DXF と同じフォルダを探す）")
     ap.add_argument("--title", default="道路モデル")
     ap.add_argument("--out", default=os.path.join(ROOT, "align"))
+    ap.add_argument("--points", help='基準点を直接指定 "X,Y,Z;X,Y,Z"（鉛直の LINE より優先）')
+    ap.add_argument("--points-note", default="", help="--points の点の説明（config.json の note に入る）")
     a = ap.parse_args()
 
     faces, lines = parse(a.dxf)
@@ -273,6 +275,12 @@ def main():
             lo = p if p[2] < q[2] else q
             pts.append({"name": f"P{len(pts) + 1}", "x": round(lo[0], 4), "y": round(lo[1], 4), "z": round(lo[2], 4),
                         "note": f"鉛直の線（長さ {abs(p[2] - q[2]):.1f} m）の下の端"})
+    if a.points:
+        notes = a.points_note.split(";") if a.points_note else []
+        pts = []
+        for k, s in enumerate(a.points.split(";")):
+            x, y, z = (float(c) for c in s.split(","))
+            pts.append({"name": f"P{k + 1}", "x": x, "y": y, "z": z, "note": notes[k] if k < len(notes) else "指定した点"})
     if len(pts) < 2:
         raise SystemExit(f"鉛直の LINE が {len(pts)} 本しかありません（2 本要る）")
 
