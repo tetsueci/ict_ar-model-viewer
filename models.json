@@ -8,9 +8,18 @@
   },
   {
     "id": "box10_marker",
-    "title": "位置合わせの試験（目印つき・手で合わせる）",
-    "description": "青い竿＝P1・橙の竿＝P2（5 m 離れた同じ標高）。竿の足もとの輪を現地の点に合わせる。iPhone でも使える",
-    "src": "models/box10_marker.glb",
+    "title": "位置合わせ：P1 を中心に回す",
+    "description": "青い竿＝P1・橙の竿＝P2（5 m）。置くと P1 が画面の中央に来る。ひねると P1 を中心に回る。iPhone でも使える",
+    "src": "models/box10_marker_p1.glb",
+    "size": "ボックス 延長 10.0 m × 幅 3.0 m × 高さ 2.6 m・P1–P2 5.0 m",
+    "arScale": "fixed"
+  },
+  {
+    "id": "box10_marker_p2",
+    "title": "位置合わせ：P2 を中心に回す",
+    "description": "置くと P2 が画面の中央に来る。ひねると P2 を中心に回る。iPhone でも使える",
+    "src": "models/box10_marker_p2.glb",
+    "size": "ボックス 延長 10.0 m × 幅 3.0 m × 高さ 2.6 m・P1–P2 5.0 m",
     "arScale": "fixed"
   }
 ]

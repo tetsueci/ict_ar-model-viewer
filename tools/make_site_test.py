@@ -60,7 +60,29 @@ def build_model(A, d, r):
         groups[col] = part
     out2 = os.path.join(ROOT, "models", "box10_marker.glb")
     n2 = write_glb(out2, groups, name="box10_marker")
+
+    # iPhone の Quick Look は指でひねると外形の中心で回る。
+    # 見えない小さな三角を反対側に足して、外形の中心と原点を P1（P2）にそろえる
+    for tag, piv in (("p1", P1), ("p2", P2)):
+        write_glb(os.path.join(ROOT, "models", f"box10_marker_{tag}.glb"),
+                  centered_on(groups, piv), name=f"box10_marker_{tag}")
     return out, n, out2, n2
+
+
+def centered_on(groups, piv):
+    g = zup_to_yup(np.array([piv], float))[0]
+    out = {k: (v - g, t) for k, (v, t) in groups.items()}
+    allv = np.concatenate([v for v, _ in out.values()])
+    m = np.abs(allv).max(axis=0)                     # 原点から最も遠い広がり
+    e = 0.01
+    tri = []
+    for sx, sz in ((-1, -1), (1, 1), (-1, 1), (1, -1)):
+        c = np.array([sx * m[0], 0.0, sz * m[2]])
+        tri.append([c, c + [-sx * e, 0, 0], c + [0, 0, -sz * e]])   # 内側へ向けて、外形を広げない
+    v = np.array(tri, float).reshape(-1, 3)
+    t = np.arange(len(v)).reshape(-1, 3)
+    out[(0.60, 0.60, 0.58, 1.0)] = (v, t)             # 1 cm の点（透明だと model-viewer が外形に数えない）
+    return out
 
 
 def _merge(parts):

@@ -177,7 +177,8 @@
   });
   mv.addEventListener('load', () => {
     const d = mv.getDimensions();
-    $('size').textContent = `幅 ${d.x.toFixed(2)} m × 高さ ${d.y.toFixed(2)} m × 奥行 ${d.z.toFixed(2)} m`;
+    const m = models.find(x => x.src === mv.src);
+    $('size').textContent = m?.size || `幅 ${d.x.toFixed(2)} m × 高さ ${d.y.toFixed(2)} m × 奥行 ${d.z.toFixed(2)} m`;
   });
   mv.addEventListener('error', () => msg('モデルを読めませんでした（パスか GLB の中身を確かめてください）'));
   // AR（WebXR）に入ったら操作の案内を出す。Scene Viewer / Quick Look は各社の画面なので出ない
