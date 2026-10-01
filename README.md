@@ -117,6 +117,9 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
   - **新しいモデルは新しいフォルダで作る**：`python tools/dxf_to_site.py <DXF> --out <フォルダ> --title "名前"`
     （`index.html` が無ければ写す）。URL は `…/ict_ar-model-viewer/<フォルダ>/`
 - **位置合わせモード**（橙）のときだけモデルが動く。「固定する」で固定中（緑）になり、触っても動かない
+- ★**基準点は何点でもよい**（`config.json` の `points` を全部使う）。◀ ▶ で固定点（青）と向ける点（橙）を選び、
+  3 点目からは十字を当てて「＋ 足す」。**記録した全部の点で最小二乗**（水平は回転＋移動〔拡大ありなら＋拡大〕・高さは平均）で置き直し、
+  点ごとのずれ（水平/高さ cm）が出る。20 cm を超える点があれば赤で出る。「近い点」で十字にいちばん近い点を選べる
 - 固定する点（P1 / P2）を選び、その点を中心に回転・拡大する
   - 「◎ P1 をここへ」：固定点を十字の位置へ
   - 「→ P2 へ向ける」：固定点を中心に回して、もう一方の点を十字の方向へ（拡大ありなら距離も合わせる）
@@ -131,8 +134,10 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
     同じフォルダの `road_box.lsp`（ボックスカルバートの寸法）から作り直す
   - **基準点＝Z 方向に立てた LINE の下の端**（2 本。見つけた順に P1・P2）
 - 試験用の一式（2 点 5 m・ボックス 10 m）は `python tools/make_site_test.py`（`sites/` に出る）
-- **IFC から作る**：`python tools/ifc_to_site.py <IFC> --out <フォルダ> --title "名前" "--points=X,Y,Z;X,Y,Z"`
-  - IFC には基準点の目印が無いので **2 点を `--points` で渡す**（座標が負なら `--points=` の形で）。
+- **IFC から作る**：`python tools/ifc_to_site.py <IFC> --out <フォルダ> --title "名前" --points-csv 基準点.csv`
+  - IFC には基準点の目印が無いので、**CSV（番号,X,Y,Z。1 行目は見出し）で何点でも渡す**。
+    2 点だけなら `"--points=X,Y,Z;X,Y,Z"` でもよい（座標が負なら `--points=` の形で）。
+    平面図は全体図＋延長 110 m ごとの拡大図（点の番号つき）
     Z は**現地で十字を当てる面（路面など）の標高**にする。埋設物の天端を書くとその深さぶん浮く
   - 平面直角座標のままだと float32 で 1 cm 近く丸まるので、`config.json` の `origin` を引いて
     `model.glb` に入れる（`common/align.js` が足し戻す。`origin` が無いフォルダは今まで通り）
