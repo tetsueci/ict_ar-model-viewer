@@ -40,7 +40,7 @@ document.body.insertAdjacentHTML('afterbegin', `
 
   <button class="start" id="start" disabled>AR を始める</button>
   <div id="support"></div>
-  <p class="muted">Android の Chrome（ARCore 対応機）で動きます。</p>
+  <p class="muted">Android の Chrome（ARCore 対応機）と iPhone で動きます。</p>
 </div>
 
 <div id="overlay">
@@ -464,8 +464,7 @@ if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(
 } else if (!launchReady(window.__vl)) {
   $('support').innerHTML = IS_IOS && VL_KEY
     ? '準備中です。少し待ってから再読み込みしてください。'
-    : 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機で開いてください）。'
-      + '<br>iPhone は <a href="../?m=box10_marker">目印つきモデル（指で合わせる版）</a> を使ってください。';
+    : 'この端末・ブラウザでは AR を始められません（Android の Chrome・ARCore 対応機か、iPhone で開いてください）。';
   window.addEventListener('vlaunch-initialized', e => { if (launchReady(e.detail)) $('support').textContent = ''; });
 }
 
