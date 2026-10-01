@@ -179,7 +179,9 @@ const PT = cfg.points.slice(0, 2);
 $('title').textContent = cfg.title || '現場 AR 位置合わせ';
 $('coords').textContent = cfg.coords || '';
 document.title = `${cfg.title} | 現場 AR`;
-if (cfg.plan) $('plan').src = cfg.plan; else $('plancard').remove();
+// 版を付けて読む：同じ名前だとスマホが前の画像・モデルを使い続ける
+const ver = u => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(cfg.version || Date.now());
+if (cfg.plan) $('plan').src = ver(cfg.plan); else $('plancard').remove();
 const f3 = v => Number(v).toFixed(3);
 $('points').querySelector('tbody').innerHTML = cfg.points.map(p =>
   `<tr><td>${p.name}</td><td>${f3(p.x)}</td><td>${f3(p.y)}</td><td>${f3(p.z)}</td><td>${p.note || ''}</td></tr>`).join('');
@@ -225,7 +227,7 @@ group.matrixAutoUpdate = false;
 group.visible = false;
 scene.add(group);
 let modelRoot = null;
-new GLTFLoader().load(cfg.model, g => { modelRoot = g.scene; group.add(modelRoot); },
+new GLTFLoader().load(ver(cfg.model), g => { modelRoot = g.scene; group.add(modelRoot); },
   undefined, () => { $('support').textContent = 'モデルを読めませんでした（' + cfg.model + '）'; });
 
 // 固定している点の目印（黄色の輪。モデルの中に置く）

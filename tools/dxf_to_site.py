@@ -301,6 +301,7 @@ def main():
     n = write_glb(os.path.join(a.out, "model.glb"), groups, name="model")
     cfg = {
         "title": a.title,
+        "version": __import__("time").strftime("%Y%m%d%H%M%S"),   # 画像とモデルの読み直し用（ブラウザの覚えた古いものを使わせない）
         "model": "model.glb",
         "plan": "plan.png",
         "coords": "図面の座標（X=東・Y=北・Z=標高、m）",
