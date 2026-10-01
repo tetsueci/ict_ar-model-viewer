@@ -298,6 +298,10 @@ def main():
             groups[col] = (zup_to_yup(v), t)
 
     os.makedirs(a.out, exist_ok=True)
+    page = os.path.join(a.out, "index.html")
+    if not os.path.exists(page):              # 新しいフォルダには入口のひな形を写す（中身は ../common/）
+        import shutil
+        shutil.copyfile(os.path.join(ROOT, "common", "page.html"), page)
     n = write_glb(os.path.join(a.out, "model.glb"), groups, name="model")
     cfg = {
         "title": a.title,

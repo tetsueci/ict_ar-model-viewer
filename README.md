@@ -111,7 +111,11 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 
 `https://<アカウント>.github.io/ict_ar-model-viewer/align/`（Android の Chrome・ARCore 対応機）
 
-- フォルダの中だけで完結する：`index.html`（ページ）・`config.json`（基準点とモデル）・`model.glb`・`plan.svg`
+- ★**ページの中身と動きは `common/` にあり、どのフォルダも同じものを使う。`common/` を直すと全フォルダに効く**
+  - `common/align.js`（画面の部品と動き）・`common/align.css`（見た目）・`common/vlaunch.js`（iPhone 用）
+  - 各フォルダには `index.html`（`common/page.html` の写し。直さない）・`config.json`（基準点とモデル）・`model.glb`・`plan.png` だけ
+  - **新しいモデルは新しいフォルダで作る**：`python tools/dxf_to_site.py <DXF> --out <フォルダ> --title "名前"`
+    （`index.html` が無ければ写す）。URL は `…/ict_ar-model-viewer/<フォルダ>/`
 - **位置合わせモード**（橙）のときだけモデルが動く。「固定する」で固定中（緑）になり、触っても動かない
 - 固定する点（P1 / P2）を選び、その点を中心に回転・拡大する
   - 「◎ P1 をここへ」：固定点を十字の位置へ
