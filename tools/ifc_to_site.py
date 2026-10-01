@@ -7,7 +7,7 @@
 
 - 形と色は IfcOpenShell のまま（世界座標・m）。Z 上向きを glTF の Y 上向きへ回す
 - 頂点をまとめて書き（glb.weld）、tools/compress.mjs で 16bit 量子化＋meshopt に詰める。
-  江別の管路 31 MB → 9.7 MB → 1.25 MB（Node.js とリポジトリ直下の npm install が要る）
+  電線共同溝（延長 370 m）の例で 31 MB → 9.7 MB → 1.25 MB（Node.js とリポジトリ直下の npm install が要る）
 - ★IFC には基準点の目印が無いので、基準点は --points-csv（何点でも）か --points で渡す（X=東 Y=北 Z=標高）。
   Z は現地で十字を当てる面（路面）の標高にする
 - 座標は平面直角座標のことが多い。float32 で丸まらないよう、origin（平面の中心を 1 m に丸めた値）を
