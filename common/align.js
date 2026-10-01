@@ -173,16 +173,29 @@ const tgtMark = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.32, 48).rotateX(-M
 tgtMark.renderOrder = 6;
 group.add(tgtMark);
 
-// すべての基準点に小さな輪と名前の札（どの印がどの点か分かるように）
+// すべての基準点に旗（高さ 1.5 m の竿＋玉、足もとの輪と中心の点）と名前の札。
+// 竿は遠くから見つけるため、輪は足もとで十字を合わせるため（make_site_test.py の試験と同じ形）。
+// 色：固定点＝青、向ける点＝橙、ほか＝白（paintFlags で塗り替える）
+const FLAG_H = 1.5;
+const FLAG_COL = { pivot: 0x1a6fd6, target: 0xf08c00, other: 0xf1f3f5 };
 const ptMarks = new THREE.Group();
 group.add(ptMarks);
+const flagMats = [];
 {
-  const ringG = new THREE.RingGeometry(0.10, 0.14, 32).rotateX(-Math.PI / 2);
-  const ringM = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthTest: false });
+  const poleG = new THREE.CylinderGeometry(0.02, 0.02, FLAG_H, 12).translate(0, FLAG_H / 2, 0);
+  const ballG = new THREE.SphereGeometry(0.08, 20, 14).translate(0, FLAG_H, 0);
+  const ringG = new THREE.RingGeometry(0.10, 0.15, 40).rotateX(-Math.PI / 2).translate(0, 0.004, 0);
+  const dotG = new THREE.CircleGeometry(0.02, 16).rotateX(-Math.PI / 2).translate(0, 0.005, 0);
   PT.forEach((pt, i) => {
-    const r = new THREE.Mesh(ringG, ringM);
-    r.position.copy(P[i]); r.position.y += 0.004; r.renderOrder = 5;
-    ptMarks.add(r);
+    const solid = new THREE.MeshStandardMaterial({ color: FLAG_COL.other, emissive: FLAG_COL.other, emissiveIntensity: 0.35 });
+    const flat = new THREE.MeshBasicMaterial({ color: FLAG_COL.other, side: THREE.DoubleSide, depthTest: false });
+    flagMats.push([solid, flat]);
+    const f = new THREE.Group();
+    f.position.copy(P[i]);
+    const ring = new THREE.Mesh(ringG, flat), dot = new THREE.Mesh(dotG, flat);
+    ring.renderOrder = dot.renderOrder = 5;
+    f.add(new THREE.Mesh(poleG, solid), new THREE.Mesh(ballG, solid), ring, dot);
+    ptMarks.add(f);
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96;
     const c = cv.getContext('2d');
     c.fillStyle = 'rgba(15,18,22,.8)'; c.beginPath(); c.roundRect(4, 4, 248, 88, 20); c.fill();
@@ -190,8 +203,14 @@ group.add(ptMarks);
     c.fillText(pt.name, 128, 50);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false }));
     sp.scale.set(0.6, 0.225, 1);
-    sp.position.copy(P[i]); sp.position.y += 0.45; sp.renderOrder = 7;
+    sp.position.copy(P[i]); sp.position.y += FLAG_H + 0.3; sp.renderOrder = 7;
     ptMarks.add(sp);
+  });
+}
+function paintFlags() {
+  flagMats.forEach(([solid, flat], i) => {
+    const c = i === pivot ? FLAG_COL.pivot : i === target ? FLAG_COL.target : FLAG_COL.other;
+    solid.color.setHex(c); solid.emissive.setHex(c); flat.color.setHex(c);
   });
 }
 
@@ -215,6 +234,7 @@ function apply() {
   pivMark.visible = aligning;
   tgtMark.position.copy(P[target]); tgtMark.position.y += 0.006;
   tgtMark.visible = aligning;
+  paintFlags();
   showUI();
 }
 // 固定中に（アンカーで）動いた行列から値を読み直す
