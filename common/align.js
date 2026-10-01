@@ -108,8 +108,11 @@ $('points').querySelector('tbody').innerHTML = cfg.points.map(p =>
   `<tr><td>${p.name}</td><td>${f3(p.x)}</td><td>${f3(p.y)}</td><td>${f3(p.z)}</td><td>${p.note || ''}</td></tr>`).join('');
 
 // 現場座標（X=東, Y=北, Z=標高）⇔ glTF（x, y=上, z=南）
-const siteToGl = p => new THREE.Vector3(p.x, p.z, -p.y);
-const glToSite = v => ({ x: v.x, y: -v.z, z: v.y });
+// origin（任意）：model.glb は現場座標から origin を引いた値で入っている。
+// 平面直角座標（10 万 m）のままだと float32 で 1 cm 近く丸まるため
+const O = { x: 0, y: 0, z: 0, ...(cfg.origin || {}) };
+const siteToGl = p => new THREE.Vector3(p.x - O.x, p.z - O.z, -(p.y - O.y));
+const glToSite = v => ({ x: v.x + O.x, y: -v.z + O.y, z: v.y + O.z });
 const P = PT.map(siteToGl);                   // モデル側の 2 点
 
 // ---------- three.js ----------

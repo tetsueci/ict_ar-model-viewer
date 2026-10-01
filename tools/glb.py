@@ -9,6 +9,7 @@
   （法線が無いと Scene Viewer / Quick Look で暗く見えることがあるため）。
 """
 import json
+import math
 import struct
 
 import numpy as np
@@ -32,7 +33,20 @@ def recenter(groups):
     return out, hi - lo
 
 
-def write_glb(path, groups, name="model"):
+def flat(verts, tris):
+    """三角形ごとに頂点を分け、平らな法線を付ける。つぶれた三角形は捨てる"""
+    p = np.asarray(verts, dtype=np.float64)[np.asarray(tris, dtype=np.int64).reshape(-1, 3)]
+    n = np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0])
+    ln = np.linalg.norm(n, axis=1, keepdims=True)
+    keep = ln[:, 0] > 1e-12
+    p, n, ln = p[keep], n[keep], ln[keep]
+    if len(p) == 0:
+        return None, None
+    return p.reshape(-1, 3).astype(np.float32), np.repeat(n / ln, 3, axis=0).astype(np.float32)
+
+
+def write_glb(path, groups, name="model", smooth=False):
+    """smooth=True なら weld() で頂点をまとめて添字付きで書く（細かいモデルを軽くする）"""
     bin_parts, views, accessors, materials, prims = [], [], [], [], []
     offset = 0
 
@@ -51,15 +65,17 @@ def write_glb(path, groups, name="model"):
         tris = np.asarray(tris, dtype=np.int64).reshape(-1, 3)
         if len(tris) == 0:
             continue
-        p = verts[tris]                                   # (M,3,3)
-        n = np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0])
-        ln = np.linalg.norm(n, axis=1, keepdims=True)
-        keep = ln[:, 0] > 1e-12                          # つぶれた三角形は捨てる
-        p, n, ln = p[keep], n[keep], ln[keep]
-        if len(p) == 0:
-            continue
-        n = np.repeat(n / ln, 3, axis=0).astype(np.float32)
-        pos = p.reshape(-1, 3).astype(np.float32)
+        idx = None
+        if smooth:
+            pos, n, idx = weld(verts, tris)
+            if len(idx) == 0:
+                continue
+            pos, n = pos.astype(np.float32), n.astype(np.float32)
+            idx = idx.astype(np.uint32 if len(pos) > 65535 else np.uint16).reshape(-1)
+        else:
+            pos, n = flat(verts, tris)
+            if pos is None:
+                continue
 
         vp = add_view(pos)
         accessors.append({"bufferView": vp, "componentType": 5126,
@@ -80,8 +96,13 @@ def write_glb(path, groups, name="model"):
         if a < 0.999:
             mat["alphaMode"] = "BLEND"
         materials.append(mat)
-        prims.append({"attributes": {"POSITION": ip, "NORMAL": inn},
-                      "material": len(materials) - 1})
+        prim = {"attributes": {"POSITION": ip, "NORMAL": inn}, "material": len(materials) - 1}
+        if idx is not None:
+            vi = add_view(idx, target=34963)
+            accessors.append({"bufferView": vi, "componentType": 5125 if idx.dtype == np.uint32 else 5123,
+                              "count": len(idx), "type": "SCALAR"})
+            prim["indices"] = len(accessors) - 1
+        prims.append(prim)
 
     if not prims:
         raise ValueError("書き出す三角形がありません")
@@ -108,3 +129,40 @@ def write_glb(path, groups, name="model"):
         f.write(struct.pack("<II", len(bn), 0x004E4942))
         f.write(bn)
     return total
+
+
+def weld(verts, tris, crease_deg=40.0, tol=1e-4):
+    """同じ位置の頂点をまとめ、なめらかな法線を付ける（三角形の数はそのまま）。
+
+    write_glb は三角形ごとに頂点を分ける（平らな法線）ので、細かい管のようなモデルでは重くなる。
+    まとめると頂点の数がおよそ 1/6 になる。面の向きが crease_deg 度より折れる角では頂点を分ける
+    （箱の角が丸く見えないように）。戻り値は (頂点, 法線, 三角形)。
+    """
+    v = np.asarray(verts, dtype=np.float64)
+    t = np.asarray(tris, dtype=np.int64).reshape(-1, 3)
+    p = v[t]
+    fn = np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0])
+    ln = np.linalg.norm(fn, axis=1)
+    keep = ln > 1e-12
+    t, fn, ln = t[keep], fn[keep], ln[keep]
+    fu = fn / ln[:, None]
+    _, pid = np.unique(np.round(v / tol).astype(np.int64), axis=0, return_inverse=True)
+    pid = pid.reshape(-1)
+    corner = pid[t].reshape(-1)                                  # 角ごとの位置番号
+    cf = np.repeat(np.arange(len(t)), 3)
+    acc = np.zeros((pid.max() + 1, 3))
+    np.add.at(acc, corner, fn[cf])                               # 面積で重みを付けた和
+    sm = acc[corner]
+    sm /= np.maximum(np.linalg.norm(sm, axis=1, keepdims=True), 1e-12)
+    sharp = np.einsum("ij,ij->i", sm, fu[cf]) < math.cos(math.radians(crease_deg))
+    # 折れた角は「位置＋面の法線」で別の頂点にする
+    key_n = np.where(sharp[:, None], np.round(fu[cf] * 1000).astype(np.int64), 0)
+    key = np.concatenate([corner[:, None], key_n], axis=1)
+    uk, inv = np.unique(key, axis=0, return_inverse=True)
+    inv = inv.reshape(-1)
+    nn = np.zeros((len(uk), 3))
+    np.add.at(nn, inv, np.where(sharp[:, None], fu[cf], sm))
+    nn /= np.maximum(np.linalg.norm(nn, axis=1, keepdims=True), 1e-12)
+    pos = np.zeros((len(uk), 3))
+    pos[inv] = v[t.reshape(-1)]
+    return pos, nn, inv.reshape(-1, 3)

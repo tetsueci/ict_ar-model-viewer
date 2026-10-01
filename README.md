@@ -131,6 +131,12 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
     同じフォルダの `road_box.lsp`（ボックスカルバートの寸法）から作り直す
   - **基準点＝Z 方向に立てた LINE の下の端**（2 本。見つけた順に P1・P2）
 - 試験用の一式（2 点 5 m・ボックス 10 m）は `python tools/make_site_test.py`（`sites/` に出る）
+- **IFC から作る**：`python tools/ifc_to_site.py <IFC> --out <フォルダ> --title "名前" "--points=X,Y,Z;X,Y,Z"`
+  - IFC には基準点の目印が無いので **2 点を `--points` で渡す**（座標が負なら `--points=` の形で）。
+    Z は**現地で十字を当てる面（路面など）の標高**にする。埋設物の天端を書くとその深さぶん浮く
+  - 平面直角座標のままだと float32 で 1 cm 近く丸まるので、`config.json` の `origin` を引いて
+    `model.glb` に入れる（`common/align.js` が足し戻す。`origin` が無いフォルダは今まで通り）
+  - 頂点をまとめて書くので、管路のような細かいモデルも軽くなる（江別の電線共同溝 31 MB → 9.7 MB）
 
 ## 現場の位置に合わせる・旧版（site.html）
 
