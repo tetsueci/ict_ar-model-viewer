@@ -6,7 +6,8 @@
   （座標が負のときは --points= の形で渡す。空白で区切ると - を見出しと取り違える）
 
 - 形と色は IfcOpenShell のまま（世界座標・m）。Z 上向きを glTF の Y 上向きへ回す
-- 頂点をまとめて書く（glb.weld）。管路のように細かいモデルが 1/3 ほどになる
+- 頂点をまとめて書き（glb.weld）、tools/compress.mjs で 16bit 量子化＋meshopt に詰める。
+  江別の管路 31 MB → 9.7 MB → 1.25 MB（Node.js とリポジトリ直下の npm install が要る）
 - ★IFC には基準点の目印が無いので、基準点は --points-csv（何点でも）か --points で渡す（X=東 Y=北 Z=標高）。
   Z は現地で十字を当てる面（路面）の標高にする
 - 座標は平面直角座標のことが多い。float32 で丸まらないよう、origin（平面の中心を 1 m に丸めた値）を
@@ -26,7 +27,7 @@ import ifcopenshell.geom
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
-from glb import write_glb, zup_to_yup  # noqa: E402
+from glb import compress_glb, write_glb, zup_to_yup  # noqa: E402
 from ifc_to_glb import DEFAULT_SKIP, FALLBACK, rgba_of  # noqa: E402
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -160,6 +161,7 @@ def main():
     g.add_argument("--points-csv", help="基準点の CSV（番号,X,Y,Z。1 行目は見出し。何点でもよい）")
     ap.add_argument("--points-note", default="", help="点の説明（; 区切り。config.json の note に入る）")
     ap.add_argument("--skip", default=DEFAULT_SKIP)
+    ap.add_argument("--no-compress", action="store_true", help="meshopt で詰めない（tools/compress.mjs を通さない）")
     a = ap.parse_args()
     out = a.out if os.path.isabs(a.out) else os.path.join(ROOT, a.out)
 
@@ -184,6 +186,12 @@ def main():
     if not os.path.exists(page):              # 新しいフォルダには入口のひな形を写す（中身は ../common/）
         shutil.copyfile(os.path.join(ROOT, "common", "page.html"), page)
     n = write_glb(os.path.join(out, "model.glb"), groups, name="model", smooth=True)
+    raw = n
+    if not a.no_compress:
+        c = compress_glb(os.path.join(out, "model.glb"))
+        if c:
+            n = os.path.getsize(os.path.join(out, "model.glb"))
+            print(f"圧縮 {raw / 1e6:.2f} MB → {n / 1e6:.2f} MB（座標の刻み {c['stepMM']} mm）")
     cfg = {
         "title": a.title,
         "version": time.strftime("%Y%m%d%H%M%S"),

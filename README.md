@@ -141,7 +141,10 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
     Z は**現地で十字を当てる面（路面など）の標高**にする。埋設物の天端を書くとその深さぶん浮く
   - 平面直角座標のままだと float32 で 1 cm 近く丸まるので、`config.json` の `origin` を引いて
     `model.glb` に入れる（`common/align.js` が足し戻す。`origin` が無いフォルダは今まで通り）
-  - 頂点をまとめて書くので、管路のような細かいモデルも軽くなる（江別の電線共同溝 31 MB → 9.7 MB）
+  - 軽くする：頂点をまとめて書き（31 MB → 9.7 MB）、最後に `tools/compress.mjs` で
+    16bit 量子化＋meshopt に詰める（→ 1.25 MB。江別の電線共同溝）。`DAM\ifcvieweriewer2_src` と同じ処理。
+    **初回だけリポジトリ直下で `npm install`**（Node.js が要る。無ければ詰めずに 9.7 MB のまま出る）。
+    座標の刻みは「モデルの箱の長い辺 / 65535」（300 m で 4.6 mm）。詰めないときは `--no-compress`
 
 ## 現場の位置に合わせる・旧版（site.html）
 

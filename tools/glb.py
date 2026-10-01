@@ -166,3 +166,29 @@ def weld(verts, tris, crease_deg=40.0, tol=1e-4):
     pos = np.zeros((len(uk), 3))
     pos[inv] = v[t.reshape(-1)]
     return pos, nn, inv.reshape(-1, 3)
+
+
+def compress_glb(path):
+    """tools/compress.mjs（dedup・16bit 量子化・meshopt）で詰め直す。
+
+    Node.js と node_modules（リポジトリ直下で npm install）が要る。無ければ詰めずに戻る。
+    """
+    import os
+    import shutil
+    import subprocess
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(here)
+    if not shutil.which("node") or not os.path.isdir(os.path.join(root, "node_modules", "meshoptimizer")):
+        print("  ★圧縮しなかった（Node.js か node_modules が無い。リポジトリ直下で npm install）")
+        return None
+    tmp = path + ".raw.glb"
+    os.replace(path, tmp)
+    r = subprocess.run(["node", os.path.join(here, "compress.mjs"), tmp, path],
+                       cwd=root, capture_output=True, text=True, encoding="utf-8")
+    if r.returncode != 0 or not os.path.exists(path):
+        os.replace(tmp, path)
+        print("  ★圧縮に失敗したので詰めないまま置いた")
+        print(r.stderr[-800:])
+        return None
+    os.remove(tmp)
+    return json.loads(r.stdout.strip().splitlines()[-1])

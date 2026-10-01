@@ -6,6 +6,8 @@
 // GLTFLoader の +esm は three を同じ URL で読むので、THREE は 1 つにそろう
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/+esm';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js/+esm';
+// meshopt で詰めた GLB（tools/compress.mjs）を戻す。詰めていない GLB はそのまま読める
+import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/meshopt_decoder.module.js/+esm';
 
 // ---------- 画面の部品 ----------
 document.body.insertAdjacentHTML('afterbegin', `
@@ -158,7 +160,7 @@ group.matrixAutoUpdate = false;
 group.visible = false;
 scene.add(group);
 let modelRoot = null;
-new GLTFLoader().load(ver(cfg.model), g => { modelRoot = g.scene; group.add(modelRoot); },
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(ver(cfg.model), g => { modelRoot = g.scene; group.add(modelRoot); },
   undefined, () => { $('support').textContent = 'モデルを読めませんでした（' + cfg.model + '）'; });
 
 // 固定している点の目印（黄色の輪。モデルの中に置く）
