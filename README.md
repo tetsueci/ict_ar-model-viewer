@@ -147,6 +147,38 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
     **初回だけリポジトリ直下で `npm install`**（Node.js が要る。無ければ詰めずに 9.7 MB のまま出る）。
     座標の刻みは「モデルの箱の長い辺 / 65535」（300 m で 4.6 mm）。詰めないときは `--no-compress`
 
+### 点群を重ねる（config.json の pointcloud）
+
+- `python tools/las_to_points.py <点群.las> --out <フォルダ> --crop=xmin,ymin,xmax,ymax --voxel 0.2`
+  - 範囲で切り、格子ごとに 1 点残して `pointcloud.glb`（点・色つき）にし、config.json に `pointcloud` を書く。
+    座標は config.json の `origin` を引く（**先に ifc_to_site.py / dxf_to_site.py でフォルダを作っておく**）
+  - 目安：熊木川橋 8,263 万点 → 橋の周り 193×173 m・20 cm 格子で 141 万点・10.7 MB（10 cm 格子だと 507 万点・81 MB で重すぎる）
+- AR の中：モデルと一緒に点群が出る。「点群：小/大/なし」で切り替え
+- 十字の下に「**点群まで ◯ cm**」（十字＝現実の地面から、いちばん近い点群の点まで）。20 cm を超えると赤＝合わせ直す目安
+- 「**点群の点を拾う**」→ 画面で点群の目印をタップ → その点が基準点 Q1, Q2 … になる（向ける点に選ばれる）。
+  十字を現実の同じ場所へ当てて「→ 向ける」か「＋ 足す」。拾った点はその回だけ（閉じると消える）
+
+### 暗号化して置く（config.json の enc）
+
+公開リポジトリのまま、パスワードを知らない人にはモデル・点群・平面図・基準点の座標を読めないようにする。
+
+1. 中身を **`_plain/<フォルダ>/`** に作る（`.gitignore` 済み。**ここはコミットしない**）
+   ```bash
+   python tools/ifc_to_site.py <IFC> --out _plain/<フォルダ> --title "名前" --points-csv 基準点.csv
+   python tools/las_to_points.py <点群.las> --out _plain/<フォルダ> --crop=... --voxel 0.2
+   ```
+2. 暗号化してリポジトリのフォルダへ出す（**パスワードはその場で 2 回入力**。画面に出ない・どこにも残らない）
+   ```bash
+   python tools/encrypt_site.py _plain/<フォルダ> <フォルダ>
+   ```
+   - 出るもの：`config.json`（タイトル・版・ファイル名は平文、`points` と `origin` は `enc.secret` に暗号化）・
+     `model.glb.enc`・`plan.png.enc`・`pointcloud.glb.enc`・`index.html`
+   - AES-GCM 256・鍵は PBKDF2-SHA256（ソルト 16 バイト・60 万回）。ファイルごとに IV を変える
+3. ページを開くとパスワード欄が出る → ブラウザの WebCrypto で復号して読む。違うと「パスワードが違います」
+- ★**パスワードはリポジトリにもコミットの説明にも書かない**
+- `enc` の無いフォルダ（align/ など）は今まで通り平文で動く
+- iPhone は Variant Launch で開き直した画面でもう一度パスワードを入れる（開き直す前の入力は引き継がれない）
+
 ## 現場の位置に合わせる・旧版（site.html）
 
 現地の 2 点を登録して、モデルを現場の座標どおりに出すページ。

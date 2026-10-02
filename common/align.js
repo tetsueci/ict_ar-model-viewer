@@ -15,6 +15,15 @@ document.body.insertAdjacentHTML('afterbegin', `
   <h1 id="title">現場 AR 位置合わせ</h1>
   <div class="muted" id="coords"></div>
 
+  <div class="card" id="pwcard" hidden>
+    <h2>パスワード</h2>
+    <form id="pwform">
+      <input type="password" id="pw" autocomplete="current-password" placeholder="パスワードを入れて「開く」">
+      <button class="start" id="pwok" type="submit">開く</button>
+    </form>
+    <div id="pwmsg"></div>
+  </div>
+
   <div class="card">
     <h2>使い方</h2>
     <ol>
@@ -27,6 +36,10 @@ document.body.insertAdjacentHTML('afterbegin', `
       <li>画面を指でなぞる・ひねると、固定した点を中心に回る（微調整は ⟲ ⟳ ボタン）。
         拡大を「あり」にすると、2 本指で広げる・つまむ、または「→ 向ける」「＋ 足す」で大きさも合わせる</li>
       <li>合ったら「固定する」（緑の表示）。固定中は画面に触ってもモデルは動かない。直すときは「位置合わせ」</li>
+      <li class="cloudonly"><b>点群</b>があるときは、モデルと一緒に点群も出る。十字の下に「点群まで ◯ cm」が出て、
+        20 cm を超えると赤になる（基準点を合わせ直す目安）。
+        「点群の点を拾う」→ 画面で点群の目印（白線の角など）をタップすると、その点が新しい基準点（Q1, Q2 …）になる。
+        十字を現実の同じ場所へ当てて「→ 向ける」か「＋ 足す」</li>
     </ol>
   </div>
 
@@ -69,6 +82,10 @@ document.body.insertAdjacentHTML('afterbegin', `
       <button id="clr" disabled>記録を消す</button>
       <button id="scaleTgl">拡大：なし</button>
     </div>
+    <div class="row adjonly cloudonly">
+      <button id="pick" disabled>点群の点を拾う</button>
+      <button id="cloud1">点群：小</button>
+    </div>
     <div class="row adjonly">
       <button id="rl">⟲ 0.5°</button>
       <button id="rr">⟳ 0.5°</button>
@@ -92,6 +109,7 @@ document.body.insertAdjacentHTML('afterbegin', `
     <div class="row lockonly">
       <button id="adjust" class="big orange">位置合わせ</button>
       <button id="toggle">半透明</button>
+      <button id="cloud2" class="cloudonly">点群：小</button>
       <button id="exit2">終わる</button>
     </div>
   </div>
@@ -103,18 +121,66 @@ document.body.insertAdjacentHTML('afterbegin', `
 const $ = id => document.getElementById(id);
 const DEG = Math.PI / 180;
 const cfg = await (await fetch('config.json', { cache: 'no-cache' })).json();
-const PT = cfg.points;                        // 基準点（2 点以上。全部使う）
-
-// ---------- 準備画面 ----------
 $('title').textContent = cfg.title || '現場 AR 位置合わせ';
 $('coords').textContent = cfg.coords || '';
 document.title = `${cfg.title} | 現場 AR`;
 // 版を付けて読む：同じ名前だとスマホが前の画像・モデルを使い続ける
 const ver = u => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(cfg.version || Date.now());
-if (cfg.plan) $('plan').src = ver(cfg.plan); else $('plancard').remove();
+
+// ---------- 暗号化（config.json の enc があるフォルダだけ） ----------
+// tools/encrypt_site.py が作る。鍵＝パスワードから PBKDF2（SHA-256・enc.iter 回・enc.salt）。
+// 中身は AES-GCM（先頭 12 バイトが IV）。基準点と origin は enc.secret に、ファイルは .enc で置く。
+// パスワードが違うと GCM の検査で復号が失敗する（それで見分ける）
+const b64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+let KEY = null;
+async function deriveKey(pw) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: b64(cfg.enc.salt), iterations: cfg.enc.iter },
+    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+}
+const decrypt = (key, buf) => {
+  const u = new Uint8Array(buf);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.subarray(0, 12) }, key, u.subarray(12));
+};
+if (cfg.enc) {
+  if (!crypto.subtle) throw new Error('この画面では復号できません（https で開いてください）');
+  $('pwcard').hidden = false;
+  $('start').hidden = true;
+  await new Promise(done => {
+    $('pwform').onsubmit = async e => {
+      e.preventDefault();
+      $('pwok').disabled = true; $('pwmsg').textContent = '確かめています…';
+      try {
+        const key = await deriveKey($('pw').value);
+        const sec = JSON.parse(new TextDecoder().decode(await decrypt(key, b64(cfg.enc.secret))));
+        Object.assign(cfg, sec);
+        KEY = key; $('pwcard').hidden = true; $('start').hidden = false; done();
+      } catch (err) {
+        $('pwmsg').textContent = 'パスワードが違います';
+        $('pwok').disabled = false;
+      }
+    };
+  });
+}
+// ファイルを ArrayBuffer で読む（暗号化してあれば復号する）
+async function fetchBuf(url) {
+  const r = await fetch(ver(url));
+  if (!r.ok) throw new Error(url + ' ' + r.status);
+  const b = await r.arrayBuffer();
+  return KEY ? decrypt(KEY, b) : b;
+}
+const PT = cfg.points;                        // 基準点（2 点以上。全部使う。点群から拾った点は後ろへ足す）
+
+// ---------- 準備画面 ----------
+if (cfg.plan) {
+  if (KEY) fetchBuf(cfg.plan).then(b => { $('plan').src = URL.createObjectURL(new Blob([b], { type: 'image/png' })); })
+    .catch(() => $('plancard').remove());
+  else $('plan').src = ver(cfg.plan);
+} else $('plancard').remove();
 const f3 = v => Number(v).toFixed(3);
 $('points').querySelector('tbody').innerHTML = cfg.points.map(p =>
   `<tr><td>${p.name}</td><td>${f3(p.x)}</td><td>${f3(p.y)}</td><td>${f3(p.z)}</td><td>${p.note || ''}</td></tr>`).join('');
+if (cfg.pointcloud) document.body.classList.add('hascloud');
 
 // 現場座標（X=東, Y=北, Z=標高）⇔ glTF（x, y=上, z=南）
 // origin（任意）：model.glb は現場座標から origin を引いた値で入っている。
@@ -160,8 +226,61 @@ group.matrixAutoUpdate = false;
 group.visible = false;
 scene.add(group);
 let modelRoot = null;
-new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(ver(cfg.model), g => { modelRoot = g.scene; group.add(modelRoot); },
-  undefined, () => { $('support').textContent = 'モデルを読めませんでした（' + cfg.model + '）'; });
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const loadGlb = async url => (await loader.parseAsync(await fetchBuf(url), '')).scene;
+loadGlb(cfg.model).then(sc => { modelRoot = sc; group.add(modelRoot); })
+  .catch(() => { $('support').textContent = 'モデルを読めませんでした（' + cfg.model + '）'; });
+
+// 点群（任意。config.json の pointcloud。tools/las_to_points.py で作る）。
+// 点の大きさは画面の画素で決める（遠くても小さくならない）。cloudSize：0＝出さない
+const CLOUD_PX = [0, 2, 4];
+let cloud = null, cloudSize = 1;
+const cloudGrid = new Map();                    // 0.5 m 角の升 → その升の点（group の中の座標・x,y,z の並び）
+const CELL = 0.5;
+const cellKey = (x, z) => (Math.floor(x / CELL) + 32768) * 65536 + (Math.floor(z / CELL) + 32768);
+if (cfg.pointcloud) {
+  $('support').textContent = '点群を読んでいます…';
+  loadGlb(cfg.pointcloud).then(sc => {
+    sc.updateWorldMatrix(false, true);          // まだ group に入れていないので、matrixWorld は点群の中での位置
+    const v = new THREE.Vector3();
+    sc.traverse(o => {
+      if (!o.isPoints) return;
+      o.material = new THREE.PointsMaterial({ size: CLOUD_PX[cloudSize], sizeAttenuation: false, vertexColors: true });
+      const a = o.geometry.getAttribute('position');
+      for (let i = 0; i < a.count; i++) {
+        v.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld);
+        const k = cellKey(v.x, v.z);
+        let c = cloudGrid.get(k);
+        if (!c) cloudGrid.set(k, c = []);
+        c.push(v.x, v.y, v.z);
+      }
+    });
+    cloud = sc; group.add(cloud);
+    $('support').textContent = '';
+  }).catch(() => { $('support').textContent = '点群を読めませんでした（' + cfg.pointcloud + '）'; });
+}
+// group の中の点 c にいちばん近い点群の点までの距離（m・group の中の長さ）。1 m より遠ければ null
+function cloudDist(c) {
+  let best = 1;
+  const i0 = Math.floor(c.x / CELL), k0 = Math.floor(c.z / CELL);
+  for (let di = -2; di <= 2; di++) for (let dk = -2; dk <= 2; dk++) {
+    const a = cloudGrid.get((i0 + di + 32768) * 65536 + (k0 + dk + 32768));
+    if (!a) continue;
+    for (let j = 0; j < a.length; j += 3) {
+      const d = Math.hypot(a[j] - c.x, a[j + 1] - c.y, a[j + 2] - c.z);
+      if (d < best) best = d;
+    }
+  }
+  return best < 1 ? best : null;
+}
+function setCloudSize(k) {
+  cloudSize = k;
+  const t = ['点群：なし', '点群：小', '点群：大'][k];
+  $('cloud1').textContent = $('cloud2').textContent = t;
+  if (!cloud) return;
+  cloud.visible = k > 0;
+  cloud.traverse(o => { if (o.isPoints) o.material.size = CLOUD_PX[k]; });
+}
 
 // 固定している点の目印（黄色の輪。モデルの中に置く）
 const pivMark = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.40, 48).rotateX(-Math.PI / 2),
@@ -181,32 +300,31 @@ const FLAG_COL = { pivot: 0x1a6fd6, target: 0xf08c00, other: 0xf1f3f5 };
 const ptMarks = new THREE.Group();
 group.add(ptMarks);
 const flagMats = [];
-{
-  const poleG = new THREE.CylinderGeometry(0.02, 0.02, FLAG_H, 12).translate(0, FLAG_H / 2, 0);
-  const ballG = new THREE.SphereGeometry(0.08, 20, 14).translate(0, FLAG_H, 0);
-  const ringG = new THREE.RingGeometry(0.10, 0.15, 40).rotateX(-Math.PI / 2).translate(0, 0.004, 0);
-  const dotG = new THREE.CircleGeometry(0.02, 16).rotateX(-Math.PI / 2).translate(0, 0.005, 0);
-  PT.forEach((pt, i) => {
-    const solid = new THREE.MeshStandardMaterial({ color: FLAG_COL.other, emissive: FLAG_COL.other, emissiveIntensity: 0.35 });
-    const flat = new THREE.MeshBasicMaterial({ color: FLAG_COL.other, side: THREE.DoubleSide, depthTest: false });
-    flagMats.push([solid, flat]);
-    const f = new THREE.Group();
-    f.position.copy(P[i]);
-    const ring = new THREE.Mesh(ringG, flat), dot = new THREE.Mesh(dotG, flat);
-    ring.renderOrder = dot.renderOrder = 5;
-    f.add(new THREE.Mesh(poleG, solid), new THREE.Mesh(ballG, solid), ring, dot);
-    ptMarks.add(f);
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96;
-    const c = cv.getContext('2d');
-    c.fillStyle = 'rgba(15,18,22,.8)'; c.beginPath(); c.roundRect(4, 4, 248, 88, 20); c.fill();
-    c.fillStyle = '#fff'; c.font = 'bold 60px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText(pt.name, 128, 50);
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false }));
-    sp.scale.set(0.6, 0.225, 1);
-    sp.position.copy(P[i]); sp.position.y += FLAG_H + 0.3; sp.renderOrder = 7;
-    ptMarks.add(sp);
-  });
+const poleG = new THREE.CylinderGeometry(0.02, 0.02, FLAG_H, 12).translate(0, FLAG_H / 2, 0);
+const ballG = new THREE.SphereGeometry(0.08, 20, 14).translate(0, FLAG_H, 0);
+const ringG = new THREE.RingGeometry(0.10, 0.15, 40).rotateX(-Math.PI / 2).translate(0, 0.004, 0);
+const dotG = new THREE.CircleGeometry(0.02, 16).rotateX(-Math.PI / 2).translate(0, 0.005, 0);
+function addFlag(pt, at) {                      // flagMats の並びは PT と同じ
+  const solid = new THREE.MeshStandardMaterial({ color: FLAG_COL.other, emissive: FLAG_COL.other, emissiveIntensity: 0.35 });
+  const flat = new THREE.MeshBasicMaterial({ color: FLAG_COL.other, side: THREE.DoubleSide, depthTest: false });
+  flagMats.push([solid, flat]);
+  const f = new THREE.Group();
+  f.position.copy(at);
+  const ring = new THREE.Mesh(ringG, flat), dot = new THREE.Mesh(dotG, flat);
+  ring.renderOrder = dot.renderOrder = 5;
+  f.add(new THREE.Mesh(poleG, solid), new THREE.Mesh(ballG, solid), ring, dot);
+  ptMarks.add(f);
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96;
+  const c = cv.getContext('2d');
+  c.fillStyle = 'rgba(15,18,22,.8)'; c.beginPath(); c.roundRect(4, 4, 248, 88, 20); c.fill();
+  c.fillStyle = '#fff'; c.font = 'bold 60px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(pt.name, 128, 50);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false }));
+  sp.scale.set(0.6, 0.225, 1);
+  sp.position.copy(at); sp.position.y += FLAG_H + 0.3; sp.renderOrder = 7;
+  ptMarks.add(sp);
 }
+PT.forEach((pt, i) => addFlag(pt, P[i]));
 function paintFlags() {
   flagMats.forEach(([solid, flat], i) => {
     const c = i === pivot ? FLAG_COL.pivot : i === target ? FLAG_COL.target : FLAG_COL.other;
@@ -370,6 +488,7 @@ function showUI() {
   $('add').disabled = !lastHit || !placed || PT.length < 3;
   $('near').disabled = !lastHit || !placed;
   $('clr').disabled = obs.size === 0;
+  $('pick').disabled = !placed || !cloud;
   $('lock').disabled = !placed;
   $('scaleTgl').textContent = allowScale ? '拡大：あり' : '拡大：なし';
 
@@ -428,9 +547,13 @@ function gstate() {
   return { n: 1, x: t[0].x, theta, s };
 }
 const gest = $('gest');
-gest.addEventListener('pointerdown', e => { touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); g0 = gstate(); });
+let tap0 = null;                                // 点を拾うときのタップ（押した位置と時刻）
+gest.addEventListener('pointerdown', e => {
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); g0 = gstate();
+  tap0 = touches.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+});
 gest.addEventListener('pointermove', e => {
-  if (!touches.has(e.pointerId) || !placed || !aligning) return;
+  if (!touches.has(e.pointerId) || !placed || !aligning || picking) return;
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const g = gstate();
   if (g.n !== g0.n) { g0 = g; return; }
@@ -441,7 +564,44 @@ gest.addEventListener('pointermove', e => {
   }
   apply();
 });
-const up = e => { touches.delete(e.pointerId); g0 = touches.size ? gstate() : null; };
+const up = e => {
+  touches.delete(e.pointerId); g0 = touches.size ? gstate() : null;
+  if (picking && tap0 && e.type === 'pointerup' && performance.now() - tap0.t < 600
+      && Math.hypot(e.clientX - tap0.x, e.clientY - tap0.y) < 15) pickAt(e.clientX, e.clientY);
+  tap0 = null;
+};
+
+// 点群の点を拾って基準点に足す（Q1, Q2 …）。タップした所へ光線を飛ばし、光線にいちばん近い点群の点を取る
+let picking = false, nPicked = 0;
+const ray = new THREE.Raycaster();
+function setPicking(on) {
+  picking = on;
+  $('pick').classList.toggle('sel', on);
+  $('pick').textContent = on ? '点群の目印をタップ（やめる）' : '点群の点を拾う';
+  if (on) { $('check').className = ''; $('check').textContent = '画面で点群の目印（白線の角・継ぎ目の端など）をタップしてください'; }
+}
+function pickAt(x, y) {
+  if (!cloud || !placed) return;
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), cam);
+  ray.params.Points.threshold = 0.15;
+  const hits = ray.intersectObject(cloud, true);
+  if (!hits.length) { $('check').className = 'bad'; $('check').textContent = '点群に当たりませんでした。点の上をタップしてください'; return; }
+  const near = hits.filter(h => h.distance <= hits[0].distance + 1.0);       // いちばん手前のかたまりの中で
+  const h = near.reduce((a, b) => (b.distanceToRay < a.distanceToRay ? b : a));
+  const v = new THREE.Vector3().fromBufferAttribute(h.object.geometry.getAttribute('position'), h.index)
+    .applyMatrix4(h.object.matrixWorld).applyMatrix4(tmpM.copy(group.matrixWorld).invert());
+  const site = glToSite(v);
+  const pt = { name: `Q${++nPicked}`, ...site, note: '点群から拾った点' };
+  PT.push(pt); P.push(v); addFlag(pt, v);
+  setPicking(false);
+  setTarget(PT.length - 1);
+  $('check').className = '';
+  $('check').textContent = `${pt.name} を拾った（X ${site.x.toFixed(2)}　Y ${site.y.toFixed(2)}　標高 ${site.z.toFixed(2)}）。`
+    + `十字を現実の同じ場所へ当てて「→ ${pt.name} へ向ける」か「＋ ${pt.name} を足す」`;
+}
+$('pick').onclick = () => setPicking(!picking);
+$('cloud1').onclick = $('cloud2').onclick = () => setCloudSize((cloudSize + 1) % 3);
 gest.addEventListener('pointerup', up);
 gest.addEventListener('pointercancel', up);
 
@@ -524,10 +684,17 @@ renderer.setAnimationLoop((time, frame) => {
 
     // 十字の位置を現場座標で
     if (placed && lastHit) {
-      const c = glToSite(lastHit.clone().applyMatrix4(tmpM.copy(group.matrix).invert()));
+      const loc = lastHit.clone().applyMatrix4(tmpM.copy(group.matrix).invert());
+      const c = glToSite(loc);
       const n = nearest(-1);
+      // 十字（現実の地面）から点群までの距離＝ずれの目安。20 cm を超えたら赤
+      const cd = cloud && cloud.visible ? cloudDist(loc) : undefined;
+      const far = cd === null || (cd !== undefined && cd * s > 0.2);
+      $('live').className = far ? 'bad' : '';
       $('live').textContent = `十字の位置　X ${c.x.toFixed(2)}　Y ${c.y.toFixed(2)}　標高 ${c.z.toFixed(2)}`
-        + (n && n.d < 5 ? `　近い点 ${PT[n.i].name} まで ${(n.d * 100).toFixed(0)} cm` : '');
+        + (n && n.d < 5 ? `　近い点 ${PT[n.i].name} まで ${(n.d * 100).toFixed(0)} cm` : '')
+        + (cd === undefined ? '' : cd === null ? '　点群まで 1 m 以上' : `　点群まで ${(cd * s * 100).toFixed(0)} cm`)
+        + (far ? '（ずれが大きい：近くの点で合わせ直す目安）' : '');
     } else $('live').textContent = '';
   }
   renderer.render(scene, camera);

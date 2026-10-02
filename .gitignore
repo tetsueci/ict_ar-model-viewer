@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 
 node_modules/
+
+# 暗号化する前の中身（tools/encrypt_site.py の入力）。公開しない
+_plain/

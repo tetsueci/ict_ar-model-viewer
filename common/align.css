@@ -59,3 +59,10 @@ img.plan { width: 100%; height: auto; border: 1px solid var(--line); border-radi
 #overlay.aligning .lockonly { display: none !important; }
 .scaleonly { display: none !important; }
 #overlay.aligning.scaling .scaleonly { display: flex !important; }
+/* 点群（config.json の pointcloud）があるときだけ出す */
+body:not(.hascloud) .cloudonly, body:not(.hascloud) #overlay .cloudonly { display: none !important; }
+#live.bad { color: #ffb4a9; }
+/* パスワード（config.json の enc があるときだけ出す） */
+#pwcard input { width: 100%; padding: 12px; font: inherit; font-size: 16px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--text); margin: 4px 0 8px; }
+#pwmsg { font-size: 13px; color: var(--warn); min-height: 1.2em; }
