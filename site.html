@@ -54,6 +54,16 @@
   #overlay button.main { background: #1a6fd6; color: #fff; font-weight: 700; padding: 14px 26px; font-size: 17px; }
   #overlay button:disabled { opacity: .4; }
   #overlay button.hide { display: none; }
+  /* 横向き（高さが低いとき）：説明は左上に小さく、ボタンは右端に縦に並べて映像を空ける */
+  @media (orientation: landscape) and (max-height: 540px) {
+    #overlay .top { right: auto; width: min(46vw, 420px); top: 8px; left: 8px; padding: 6px 10px; font-size: 13px; line-height: 1.4; }
+    #overlay .top b { font-size: 14px; }
+    #overlay .check, #overlay .live { font-size: 12px; margin-top: 3px; }
+    #overlay .bottom { left: auto; right: 10px; top: 8px; bottom: 8px; flex-direction: column; flex-wrap: nowrap;
+      justify-content: center; align-items: stretch; padding: 0; width: 120px; }
+    #overlay button { padding: 9px 10px; font-size: 14px; }
+    #overlay button.main { padding: 14px 10px; font-size: 16px; }
+  }
 </style>
 </head>
 <body>
