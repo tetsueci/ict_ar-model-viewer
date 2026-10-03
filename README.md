@@ -11,16 +11,21 @@
 
 AR は **HTTPS でないと動きません**。GitHub Pages は HTTPS なのでそのまま使えます。
 
+> **★ページの中身（`common/`）と道具（`tools/`）は ict_ar-viewer にある**（2026-10-03。正は 1 か所）。
+> 各フォルダの `index.html` は `https://tetsueci.github.io/ict_ar-viewer/common/` を読む。直すのは ict_ar-viewer の `common/` で、
+> 直すとこのリポジトリの全フォルダにも効く。道具はこのリポジトリの直下で
+> `python ../ict_ar-viewer/tools/<道具>.py … --out ../ar-model-viewer/<フォルダ>` と打つ
+> （`--out` はこの形で書く。新しいフォルダの `index.html` は自動で上の URL を読む形になる）。
+> 暗号化する現場は ict_ar-viewer に置く（このリポジトリには置かない）。
+
 ## 中身
 
 ```
 index.html        表示ページ（モデルの一覧・AR ボタン・PC 用の QR）
 models.json       表示するモデルの一覧 ← モデルを足すときはここに 1 行
 models/           GLB を置く
-tools/
-  ifc_to_glb.py   IFC → GLB（実寸・メートル・床に置ける向き）
-  make_sample.py  サンプル（ボックスカルバート）を作る
-  glb.py          GLB 書き出しの共通部分
+align/ TEST-E/    現場合わせのフォルダ（index.html・config.json・model.glb・plan.png）
+（道具 tools/ と common/ は ict_ar-viewer にある）
 .nojekyll         GitHub Pages に Jekyll の加工をさせない
 ```
 
@@ -75,7 +80,7 @@ tools/
 ### IFC から作る
 
 ```bash
-python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
+python ../ict_ar-viewer/tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 ```
 
 - IfcOpenShell が要る（`pip install ifcopenshell numpy`）
@@ -83,7 +88,7 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 - 大きい構造物（橋など）を机の上で見たいときは縮尺をかける
 
   ```bash
-  python tools/ifc_to_glb.py 入力.ifc models/bridge_1-100.glb --scale 0.01
+  python ../ict_ar-viewer/tools/ifc_to_glb.py 入力.ifc models/bridge_1-100.glb --scale 0.01
   ```
 
   縮尺をかけたものは `arScale` を `auto` にすると、置いてから指で大きさを変えられる
@@ -111,10 +116,10 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 
 `https://<アカウント>.github.io/ict_ar-model-viewer/align/`（Android の Chrome・ARCore 対応機）
 
-- ★**ページの中身と動きは `common/` にあり、どのフォルダも同じものを使う。`common/` を直すと全フォルダに効く**
+- ★**ページの中身と動きは ict_ar-viewer の `common/` にあり、どのフォルダも同じものを使う。そこを直すと全フォルダに効く**
   - `common/align.js`（画面の部品と動き）・`common/align.css`（見た目）・`common/vlaunch.js`（iPhone 用）
   - 各フォルダには `index.html`（`common/page.html` の写し。直さない）・`config.json`（基準点とモデル）・`model.glb`・`plan.png` だけ
-  - **新しいモデルは新しいフォルダで作る**：`python tools/dxf_to_site.py <DXF> --out <フォルダ> --title "名前"`
+  - **新しいモデルは新しいフォルダで作る**：`python ../ict_ar-viewer/tools/dxf_to_site.py <DXF> --out ../ar-model-viewer/<フォルダ> --title "名前"`
     （`index.html` が無ければ写す）。URL は `…/ict_ar-model-viewer/<フォルダ>/`
 - **位置合わせモード**（橙）のときだけモデルが動く。「固定する」で固定中（緑）になり、触っても動かない
 - ★**基準点は何点でもよい**（`config.json` の `points` を全部使う）。◀ ▶ で固定点（青）と向ける点（橙）を選び、
@@ -128,28 +133,28 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 - 中身（model.glb・config.json・plan.png）は道路モデルの DXF から作る
 
   ```bash
-  python tools/dxf_to_site.py <model.dxf> --title "名前"
+  python ../ict_ar-viewer/tools/dxf_to_site.py <model.dxf> --out ../ar-model-viewer/align --title "名前"
   ```
 
   - 読む図形：ポリゴンメッシュ・ポリフェースメッシュ・3DFACE。3DSOLID は DXF から形が読めないので、
     同じフォルダの `road_box.lsp`（ボックスカルバートの寸法）から作り直す
   - **基準点＝Z 方向に立てた LINE の下の端**（2 本。見つけた順に P1・P2）
-- 試験用の一式（2 点 5 m・ボックス 10 m）は `python tools/make_site_test.py`（`sites/` に出る）
-- **IFC から作る**：`python tools/ifc_to_site.py <IFC> --out <フォルダ> --title "名前" --points-csv 基準点.csv`
+- 試験用の一式（2 点 5 m・ボックス 10 m）は `python ../ict_ar-viewer/tools/make_site_test.py`（`sites/` に出る）
+- **IFC から作る**：`python ../ict_ar-viewer/tools/ifc_to_site.py <IFC> --out ../ar-model-viewer/<フォルダ> --title "名前" --points-csv 基準点.csv`
   - IFC には基準点の目印が無いので、**CSV（番号,X,Y,Z。1 行目は見出し）で何点でも渡す**。
     2 点だけなら `"--points=X,Y,Z;X,Y,Z"` でもよい（座標が負なら `--points=` の形で）。
     平面図は全体図＋延長 110 m ごとの拡大図（点の番号つき）
     Z は**現地で十字を当てる面（路面など）の標高**にする。埋設物の天端を書くとその深さぶん浮く
   - 平面直角座標のままだと float32 で 1 cm 近く丸まるので、`config.json` の `origin` を引いて
     `model.glb` に入れる（`common/align.js` が足し戻す。`origin` が無いフォルダは今まで通り）
-  - 軽くする：頂点をまとめて書き（31 MB → 9.7 MB）、最後に `tools/compress.mjs` で
+  - 軽くする：頂点をまとめて書き（31 MB → 9.7 MB）、最後に ict_ar-viewer の `tools/compress.mjs` で
     16bit 量子化＋meshopt に詰める（→ 1.25 MB。電線共同溝 延長 370 m の例）。`DAM\ifcviewer\viewer2_src` と同じ処理。
-    **初回だけリポジトリ直下で `npm install`**（Node.js が要る。無ければ詰めずに 9.7 MB のまま出る）。
+    **初回だけ ict_ar-viewer の直下で `npm install`**（Node.js が要る。無ければ詰めずに 9.7 MB のまま出る）。
     座標の刻みは「モデルの箱の長い辺 / 65535」（300 m で 4.6 mm）。詰めないときは `--no-compress`
 
 ### 点群を重ねる（config.json の pointcloud）
 
-- `python tools/las_to_points.py <点群.las> --out <フォルダ> --crop=xmin,ymin,xmax,ymax --voxel 0.2`
+- `python ../ict_ar-viewer/tools/las_to_points.py <点群.las> --out ../ar-model-viewer/<フォルダ> --crop=xmin,ymin,xmax,ymax --voxel 0.2`
   - 範囲で切り、格子ごとに 1 点残して `pointcloud.glb`（点・色つき）にし、config.json に `pointcloud` を書く。
     座標は config.json の `origin` を引く（**先に ifc_to_site.py / dxf_to_site.py でフォルダを作っておく**）
   - 目安：熊木川橋 8,263 万点 → 橋の周り 193×173 m・20 cm 格子で 141 万点・10.7 MB（10 cm 格子だと 507 万点・81 MB で重すぎる）
@@ -158,26 +163,9 @@ python tools/ifc_to_glb.py 入力.ifc models/kumakigawa.glb
 - 「**点群の点を拾う**」→ 画面で点群の目印をタップ → その点が基準点 Q1, Q2 … になる（向ける点に選ばれる）。
   十字を現実の同じ場所へ当てて「→ 向ける」か「＋ 足す」。拾った点はその回だけ（閉じると消える）
 
-### 暗号化して置く（config.json の enc）
+### 暗号化して置く
 
-公開リポジトリのまま、パスワードを知らない人にはモデル・点群・平面図・基準点の座標を読めないようにする。
-
-1. 中身を **`_plain/<フォルダ>/`** に作る（`.gitignore` 済み。**ここはコミットしない**）
-   ```bash
-   python tools/ifc_to_site.py <IFC> --out _plain/<フォルダ> --title "名前" --points-csv 基準点.csv
-   python tools/las_to_points.py <点群.las> --out _plain/<フォルダ> --crop=... --voxel 0.2
-   ```
-2. 暗号化してリポジトリのフォルダへ出す（**パスワードはその場で 2 回入力**。画面に出ない・どこにも残らない）
-   ```bash
-   python tools/encrypt_site.py _plain/<フォルダ> <フォルダ>
-   ```
-   - 出るもの：`config.json`（タイトル・版・ファイル名は平文、`points` と `origin` は `enc.secret` に暗号化）・
-     `model.glb.enc`・`plan.png.enc`・`pointcloud.glb.enc`・`index.html`
-   - AES-GCM 256・鍵は PBKDF2-SHA256（ソルト 16 バイト・60 万回）。ファイルごとに IV を変える
-3. ページを開くとパスワード欄が出る → ブラウザの WebCrypto で復号して読む。違うと「パスワードが違います」
-- ★**パスワードはリポジトリにもコミットの説明にも書かない**
-- `enc` の無いフォルダ（align/ など）は今まで通り平文で動く
-- iPhone は Variant Launch で開き直した画面でもう一度パスワードを入れる（開き直す前の入力は引き継がれない）
+暗号化する現場は **ict_ar-viewer** に置く（手順もあちらの README）。
 
 ## 現場の位置に合わせる・旧版（site.html）
 
@@ -198,7 +186,7 @@ Android の Chrome（ARCore 対応機）専用。
 | `points` | 基準点。先頭の 2 点を使う。`x`=東 `y`=北 `z`=標高（m） |
 | `plan` | （任意）平面図の画像 |
 
-試験用の一式（2 点が 5 m・ボックス延長 10 m）は `python tools/make_site_test.py` で作り直せる。
+試験用の一式（2 点が 5 m・ボックス延長 10 m）は `python ../ict_ar-viewer/tools/make_site_test.py` で作り直せる。
 
 ## 3. 手元で確かめる
 
