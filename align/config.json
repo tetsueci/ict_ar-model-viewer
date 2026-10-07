@@ -10,5 +10,6 @@
     "y": 28100.0,
     "z": 0.0
   },
-  "start": "pick"
+  "start": "pick",
+  "pointcloud": "pointcloud.glb"
 }
