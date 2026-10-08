@@ -1,8 +1,7 @@
 {
   "title": "佐賀 208 号 道路モデル",
-  "version": "20261008093718",
+  "version": "20261008093918",
   "model": "model.glb",
-  "plan": "plan.png",
   "coords": "図面の座標（X=東・Y=北・Z=標高、m）",
   "points": [],
   "origin": {
