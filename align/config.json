@@ -1,6 +1,6 @@
 {
   "title": "佐賀 208 号 道路モデル",
-  "version": "20261007185958",
+  "version": "20261008093718",
   "model": "model.glb",
   "plan": "plan.png",
   "coords": "図面の座標（X=東・Y=北・Z=標高、m）",
@@ -11,5 +11,13 @@
     "z": 0.0
   },
   "start": "pick",
-  "pointcloud": "pointcloud.glb"
+  "pointcloud": "pointcloud.glb",
+  "machines": [
+    {
+      "id": "backhoe08"
+    },
+    {
+      "id": "KATO_SR250Rf2"
+    }
+  ]
 }
