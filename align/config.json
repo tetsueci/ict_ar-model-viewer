@@ -102,5 +102,10 @@
   ],
   "machinesWithCloud": "cloudOnly",
   "plan": "plan.jpg",
-  "pointsTable": false
+  "pointsTable": false,
+  "traffic": {
+    "file": "traffic.json",
+    "speed": 60,
+    "gap": 60
+  }
 }
