@@ -10,6 +10,5 @@
   },
   "points": [],
   "pointcloud": "pointcloud.glb",
-  "start": "pick",
-  "offline": true
+  "start": "pick"
 }
